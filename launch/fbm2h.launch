@@ -36,7 +36,8 @@
 			type="record"
 			name="log_fbmh2"
 			args="record -o /home/rockin/logs/log_fbm2h
-				--split --duration=1h/fbm2h/bmbox_state
+				--split --duration=1h
+				/fbm2h/bmbox_state
 				/fbm2h/client_state
 				/fbm2h/refbox_state
 				/fbm2h/map
