@@ -15,7 +15,7 @@ from rockin_scoring.BmBox import BmBox
 TRANS_TOLERANCE = 0.01 # meters
 ROT_TOLERANCE = 0.19 # radiants = pi/16 #TODO maybe degrees are better
 
-# mocap data received to get the last pose available
+# mocap data received to get the latest pose available
 #last_robot_pose = None
 
 #def mocap_callback(pose):
