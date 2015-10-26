@@ -7,10 +7,6 @@ import yaml
 import rospy
 from rockin_scoring.Client import Client
 
-### test
-print "BM1H client test node started"
-###
-
 benchmark = Client("client_test")
 
 # Get items	to generate random results

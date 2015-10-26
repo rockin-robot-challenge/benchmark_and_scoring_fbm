@@ -11,10 +11,6 @@ import tf
 from geometry_msgs.msg import Pose2D
 from rockin_scoring.BmBox import BmBox
 
-# Ground truth tolerance
-TRANS_TOLERANCE = 0.01 # meters
-ROT_TOLERANCE = 0.19 # radiants = pi/16 #TODO maybe degrees are better
-
 # mocap data received to get the latest pose available
 #last_robot_pose = None
 
@@ -55,19 +51,13 @@ def main():
 	timeouts = 0
 	segments_detail = {}
 	
-	# check that the robot is visible before starting TODO: test
-	robot_visible = False
-	while not robot_visible:
-		try:
-			tf_listener.lookupTransform("/world", "/robot_at_home", rospy.Time(0))
-			robot_visible = True
-			
-			#TODO check initial robot position (waypoint 0) within tolerance 
-
-		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-			rospy.loginfo("ROBOT NOT VISIBLE")
-			time.sleep(1)
-			robot_visible = False
+	#TODO: aquire the robot-marker tranform or load it if there is a saved one
+	try:
+		robot_marker_transform = tf_listener.lookupTransform("/world", "/robot_at_home", rospy.Time(0))
+		
+	except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+		rospy.loginfo("robot-marker tranform not aquired")
+		#TODO then what?
 				
 	
 	# Wait for client
@@ -110,7 +100,7 @@ def main():
 #		segments_detail[i]['robot_pose'] = yaml.dump(robot_pose)
 #		TODO: check that the last robot_pose is suitable (i.e. not too old)
 		
-		# Collect the target and robot poses (using tf) TODO: test
+		# Collect the target and robot poses (using tf) TODO: apply robot-marker inverse tranform
 		try:
 			now = rospy.Time.now() #TODO: use end_segment_time (or even the timestamp of the reached_waypoint message)
 			tf_listener.waitForTransform("/world", "/robot_at_home", now, rospy.Duration(4.0))
@@ -123,6 +113,8 @@ def main():
 		target_pose = Pose2D(waypoints[i]['x'], waypoints[i]['y'], waypoints[i]['theta'])
 		segments_detail[i]['target_pose'] = yaml.dump(target_pose)
 		segments_detail[i]['robot_pose']  = yaml.dump(robot_pose)
+		
+		print
 			
 		if benchmark.Timeout():
 			rospy.loginfo( "TIMEOUT" )

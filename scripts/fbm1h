@@ -74,7 +74,7 @@ def main():
 				ref_board_visible = True
 
 			except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-				rospy.logdebug("Reference board not visible")
+				rospy.loginfo("Reference board not visible")
 				time.sleep(1)
 				ref_board_visible = False
 				
