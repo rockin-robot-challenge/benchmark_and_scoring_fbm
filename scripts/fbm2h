@@ -27,7 +27,7 @@ def main():
 	
 	# init tf and subscribers
 	tf_listener = tf.TransformListener()
-#	br = tf.TransformBroadcaster()
+	tf_broadcaster = tf.TransformBroadcaster()
 #	mocap_sub = rospy.Subscriber("/fbm2h/robot_at_home/pose2d", Pose2D, mocap_callback)
 #	rospy.loginfo('subscribed to "/fbm2h/robot_at_home/pose2d"')
 	
@@ -51,14 +51,38 @@ def main():
 	timeouts = 0
 	segments_detail = {}
 	
-	#TODO: aquire the robot-marker tranform or load it if there is a saved one
+	# sleep deprived, overcomplicated and possibly wrong version (also incomplete)
+#	try:
+#		(x_r0, y_r0, theta_r0) = (waypoints[0]['x'], waypoints[0]['y'], waypoints[0]['theta'])
+#		
+#		starting_rotation = ... from theta_r0
+#
+#		# broadcast the robot frame relative to the marker
+#		tf_broadcaster.sendTransform((x0, y0, 0.0), starting_rotation, now, "actual_robot", "robot_at_home")
+#		
+#		# receive the robot transform and compute the robot pose
+#		tf_listener.waitForTransform("world", "actual_robot", now, rospy.Duration(1.0))
+#		
+#		marker_to_robot_transform = tf_listener.lookupTransform("robot_at_home", "actual_robot", rospy.Time(0))
+#		
+#	except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+#		rospy.loginfo("marker-robot tranform not aquired")
+	
+	# Aquire the marker-robot transform #TODO: or load it if there is a saved one
 	try:
-		robot_marker_transform = tf_listener.lookupTransform("/world", "/robot_at_home", rospy.Time(0))
+		# Starting robot pose (the robot is initially posed as the starting pose (waypoint 0)
+		(x_r0, y_r0, theta_r0) = (waypoints[0]['x'], waypoints[0]['y'], waypoints[0]['theta'])
+		
+		# Collect the starting marker pose (x_m0, y_m0, theta_m0)
+		( (x_m0, y_m0, _), marker_rotation_0 ) = tf_listener.lookupTransform("/world", "/robot_at_home", rospy.Time(0))
+		(_, _, theta_m0) = tf.transformations.euler_from_quaternion(marker_rotation_0)
+		
+		# Compute the marker to robot (2D)transform (x_mr, y_mr, theta_mr)
+		(x_mr, y_mr, theta_mr) = (x_r0-x_m0, y_r0-y_m0, theta_r0-theta_m0)
 		
 	except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-		rospy.loginfo("robot-marker tranform not aquired")
+		rospy.loginfo("marker-robot transform not aquired")
 		#TODO then what?
-				
 	
 	# Wait for client
 	benchmark.WaitClient()
@@ -100,19 +124,48 @@ def main():
 #		segments_detail[i]['robot_pose'] = yaml.dump(robot_pose)
 #		TODO: check that the last robot_pose is suitable (i.e. not too old)
 		
-		# Collect the target and robot poses (using tf) TODO: apply robot-marker inverse tranform
-		try:
-			now = rospy.Time.now() #TODO: use end_segment_time (or even the timestamp of the reached_waypoint message)
-			tf_listener.waitForTransform("/world", "/robot_at_home", now, rospy.Duration(4.0))
-			(trans, rot) = tf_listener.lookupTransform("/world", "/robot_at_home", now)
-			euler = tf.transformations.euler_from_quaternion(rot)
-			robot_pose = Pose2D(trans[0], trans[1], euler[2])
-		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-			rospy.loginfo("Robot pose not available") #TODO: what to do in such case? maybe use the latest available one or try again
+		# Collect the target and robot poses (using tf)		### obsolete
+#		try:
+#			now = rospy.Time.now()
+#			tf_listener.waitForTransform("/world", "/robot_at_home", now, rospy.Duration(4.0))
+#			(trans, rot) = tf_listener.lookupTransform("/world", "/robot_at_home", now)
+#			euler = tf.transformations.euler_from_quaternion(rot)
+#			robot_pose = Pose2D(trans[0], trans[1], euler[2])
+#		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+#			rospy.loginfo("Robot pose not available") #TODO: what to do in such case? maybe use the latest available one or try again
 		
-		target_pose = Pose2D(waypoints[i]['x'], waypoints[i]['y'], waypoints[i]['theta'])
-		segments_detail[i]['target_pose'] = yaml.dump(target_pose)
-		segments_detail[i]['robot_pose']  = yaml.dump(robot_pose)
+		# sleep deprived, overcomplicated and possibly wrong version
+#		try:
+#			now = rospy.Time.now()
+#			
+#			# world_to_marker transform
+#			marker_transform = tf_listener.lookupTransform("world", "robot_at_home", now)
+#			
+#			# broadcast the robot frame relative to the marker
+#			tf_broadcaster.sendTransform(marker_to_robot_transform[0], marker_to_robot_transform[1], now, "actual_robot", "robot_at_home")
+#			
+#			# receive the robot transform and compute the robot pose
+#			tf_listener.waitForTransform("world", "actual_robot", now, rospy.Duration(1.0))
+#			( (robot_x, robot_y, _), robot_rotation ) = tf_listener.lookupTransform("world", "actual_robot", now)
+#			(_, _, robot_theta) = tf.transformations.euler_from_quaternion(robot_rotation)
+#			robot_pose = Pose2D(robot_x, robot_y, robot_theta)
+#			
+#		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+#			rospy.loginfo("Robot pose not available") #TODO: what to do in such case? maybe try again
+		
+		try:
+			# Collect the marker pose (x_m, y_m, theta_m)
+			( (x_m, y_m, _), marker_rotation ) = tf_listener.lookupTransform("/world", "/robot_at_home", rospy.Time(0))
+			(_, _, theta_m) = tf.transformations.euler_from_quaternion(marker_rotation)
+		
+			# Compute the robot pose and target pose
+			robot_pose = Pose2D(x_m+x_mr, y_m+y_mr, theta_m+theta_mr)
+			target_pose = Pose2D(waypoints[i]['x'], waypoints[i]['y'], waypoints[i]['theta'])
+			segments_detail[i]['target_pose'] = yaml.dump(target_pose)
+			segments_detail[i]['robot_pose']  = yaml.dump(robot_pose)
+			
+		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+			rospy.loginfo("Robot pose not available") #TODO: what to do in such case? maybe try again
 		
 		
 		if benchmark.Timeout():
