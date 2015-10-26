@@ -114,8 +114,7 @@ def main():
 		segments_detail[i]['target_pose'] = yaml.dump(target_pose)
 		segments_detail[i]['robot_pose']  = yaml.dump(robot_pose)
 		
-		print
-			
+		
 		if benchmark.Timeout():
 			rospy.loginfo( "TIMEOUT" )
 			execution_time = execution_time + segment_time
