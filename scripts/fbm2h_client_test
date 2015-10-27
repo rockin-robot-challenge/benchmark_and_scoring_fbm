@@ -8,6 +8,7 @@ import rospy
 from rockin_scoring.Client import Client
 
 benchmark = Client("client_test")
+rospy.loginfo("FBM1H client test node started")
 
 # Get items	to generate random results
 #items = rospy.get_param('items')
@@ -18,14 +19,13 @@ raw_input("ready to start: press ENTER")
 
 # Connect to the refbox (check time sync, etc)
 benchmark.Connect()
-rospy.loginfo("FBM1H client test node started")
 
 waypoints = None
 i = 1
 
 segments_execution_time = {1: 1 , 2: 4 , 3: 6 , 4: 3}
 
-while (benchmark.Running()):
+while (benchmark.Running() and (not waypoints or i < len(waypoints))):
 	# Get the goal (encoded as YAML string)
 	goal_yaml = benchmark.RequestGoal()
 	goal = yaml.load(goal_yaml)
