@@ -1,7 +1,7 @@
 waypoints:
-- x: 0.0
-  y: 0.0
-  theta: 0.0
+- x: 1.0
+  y: -1.0
+  theta: 0.7853981633974483
 - x: 1.5
   y: 0.0
   theta: 0.0
@@ -17,4 +17,4 @@ waypoints:
 penalty_time:
   10
 timeout_time:
-  20
+  3600
