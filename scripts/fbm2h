@@ -109,7 +109,7 @@ def main():
 		segments_detail[i]['end_segment_time'] = end_segment_time
 		segments_detail[i]['segment_time'] = segment_time
 		
-		# overcomplicated and possibly wrong version
+		# Collect the target and robot poses (using tf)
 		try:
 			now = rospy.Time.now()
 		
