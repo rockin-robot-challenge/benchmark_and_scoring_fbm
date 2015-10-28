@@ -55,7 +55,7 @@ def main():
 	
 	# Aquire the marker-robot transform
 	try:
-		time.sleep(1.0)
+		time.sleep(1.0) # TODO: does it need more time?
 		
 		now = rospy.Time.now()
 		
