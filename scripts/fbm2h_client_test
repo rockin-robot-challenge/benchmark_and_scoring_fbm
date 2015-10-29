@@ -21,17 +21,17 @@ raw_input("ready to start: press ENTER")
 benchmark.Connect()
 
 waypoints = None
-i = 1
+i = 0
 
 segments_execution_time = {1: 1 , 2: 4 , 3: 6 , 4: 3}
 
-while (benchmark.Running() and (not waypoints or i < len(waypoints))):
+while (benchmark.Running() and (not waypoints or i <= len(waypoints))):
 	# Get the goal (encoded as YAML string)
 	goal_yaml = benchmark.RequestGoal()
 	goal = yaml.load(goal_yaml)
 	if goal:
-		waypoints = goal
-		print "<- RECEIVED WAYPOINTS", waypoints
+		waypoints = goal['waypoints']
+		print "<- RECEIVED GOAL", goal
 	else:
 		print "<- RECEIVED GOAL (EMPTY)"
 	
@@ -46,7 +46,7 @@ while (benchmark.Running() and (not waypoints or i < len(waypoints))):
 	raw_input("ready to send reached_waypoint: press ENTER")
 	
 	result = {
-		'int': i
+		'reached_waypoint': i
 	}
 	
 	print "-> SENDING RESULT"

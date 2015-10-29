@@ -32,17 +32,21 @@ def main():
 #	rospy.loginfo('subscribed to "/fbm2h/robot_at_home/pose2d"')
 	
 	# Get the parameters of the benchmark (waypoints, penalty_time, timeout_time)
-	#TODO: what's the format of the yaml data sent as goal payload?
-	waypoints = rospy.get_param('waypoints')
-	penalty_time = rospy.get_param('penalty_time')
-	timeout_time = rospy.get_param('timeout_time')
+	starting_robot_pose = Pose2D(*rospy.get_param('goal/starting_pose'))
+	waypoints = rospy.get_param('goal/waypoints')
+	penalty_time = rospy.get_param('goal/penalty_time')
+	timeout_time = rospy.get_param('goal/timeout_time')
 	
-	# The goal payload sent to the client containing the list of all waypoints
-	goal_payload_yaml = yaml.dump(waypoints)
+	rospy.set_param('goal/num_waypoints', len(waypoints))
+	
+	# The goal payload sent to the client containing the list of all waypoints, etc
+	goal_payload_yaml = yaml.dump(rospy.get_param('goal'))
+	
+	rospy.loginfo( "Goal from config: %s" % goal_payload_yaml )
 	
 	# Variables to compute score
-	N = len(waypoints) - 1
-	i = 1
+	N = len(waypoints)
+	i = 0
 	sum_d = 0.0 # [m]
 	sum_sin = 0.0
 	sum_cos = 0.0
@@ -59,12 +63,12 @@ def main():
 		
 		now = rospy.Time.now()
 		
-		# Starting robot pose (the robot is initially posed as the starting pose (waypoint 0))
-		(x_r0, y_r0, theta_r0) = (waypoints[0]['x'], waypoints[0]['y'], waypoints[0]['theta'])
-		starting_robot_rotation = tf.transformations.quaternion_from_euler(0, 0, theta_r0)
-
+		# Starting robot pose from Pose2D
+		starting_robot_position = (starting_robot_pose.x, starting_robot_pose.y, 0.0)
+		starting_robot_rotation = tf.transformations.quaternion_from_euler(0, 0, starting_robot_pose.theta)
+		
 		# broadcast the robot frame relative to the marker
-		tf_broadcaster.sendTransform((x_r0, y_r0, 0.0), starting_robot_rotation, now, "/actual_robot", "/world")
+		tf_broadcaster.sendTransform(starting_robot_position, starting_robot_rotation, now, "/actual_robot", "/world")
 		
 		# receive the robot transform and compute the robot pose
 #		tf_listener.waitForTransform("/world", "/actual_robot", now, rospy.Duration(2.0))
@@ -81,10 +85,10 @@ def main():
 	benchmark.WaitClient()
 	
 	# Start the benchmark
-	while benchmark.Running() and not benchmark.Timeout() and i <= N:
+	while benchmark.Running() and not benchmark.Timeout() and i < N:
 
 		# Send goal
-		if i == 1: # first run (robot in starting position, next waypoint is p1)
+		if i == 0: # first run (robot in starting position, next waypoint is p0)
 			benchmark.SendGoal(goal_payload_yaml)
 		else:
 			benchmark.SendGoal()
@@ -96,13 +100,13 @@ def main():
 		segments_detail[i]['start_segment_time'] = start_segment_time
 		
 		# Wait for result from client
-		result_yaml			= benchmark.WaitResult()
-		result = yaml.load(result_yaml)['int']
+		result_yaml	= benchmark.WaitResult()
+		result = yaml.load(result_yaml)['reached_waypoint']
 		segments_detail[i]['result_payload'] = result_yaml
 		
 		if result != i: #TODO: what to do in such case?
 			rospy.loginfo( "WRONG WAYPOINT: %s received instead of %s" % (result, i) )
-			continue
+			# continue #TODO: what to do in such case?
 		
 		# Compute segment time
 		end_segment_time	= time.time()
@@ -129,7 +133,7 @@ def main():
 				(_, _, robot_theta) = tf.transformations.euler_from_quaternion(robot_rotation)
 				
 				robot_pose = Pose2D(robot_x, robot_y, robot_theta)
-				target_pose = Pose2D(waypoints[i]['x'], waypoints[i]['y'], waypoints[i]['theta'])
+				target_pose = Pose2D(*waypoints[i])
 		
 				segments_detail[i]['target_pose'] = yaml.dump(target_pose)
 				segments_detail[i]['robot_pose']  = yaml.dump(robot_pose)
@@ -162,6 +166,8 @@ def main():
 			segments_detail[i]['penalty'] = True
 		else:
 			segments_detail[i]['penalty'] = False
+		
+		print segment_time, timeout_time
 		
 		# Enforcing of rule: If robots spent more time than this deadline when going from one waypoint to the next waypoint, they will not get points on that path. (assuming penalization from precedent rule is implied when this rule is enforced) 
 		if segment_time > timeout_time:
@@ -200,13 +206,18 @@ def main():
 	position_accuracy = sum_d / N
 	orientation_accuracy = math.atan2(sum_sin, sum_cos)
 	
+	hits = raw_input("Insert number of hits ")
+	details = {'marker-robot transform': marker_to_robot_transform}
+	
 	score = {
 		'position_accuracy': position_accuracy,
 		'orientation_accuracy': orientation_accuracy,
 		'penalized_segments': penalties,
 		'timeout_segments': timeouts,
 		'execution_time': execution_time,
-		'segments_details': segments_detail
+		'hits': hits,
+		'segments_details': segments_detail,
+		'details': details
 	}
 	
 	score_yaml = yaml.dump(score, default_flow_style=False)
