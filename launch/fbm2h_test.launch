@@ -49,7 +49,7 @@
 		<node pkg="rosbag"
 			type="record"
 			name="log_fbmh2"
-			args="record -o /home/rockin/logs/log_fbm2h_test
+			args="record -o /home/rockin/logs/log_fbm2h
 				--split --duration=1h
 				/fbm2h/bmbox_state
 				/fbm2h/client_state
