@@ -57,29 +57,36 @@ def main():
 	
 	#raw_input("press ENTER to START")
 	
+	raw_input("press ENTER if the robot is posed on the start pose")
+	
 	# Acquire the marker-robot transform
-	try:
-		time.sleep(1.0) # TODO: does it need more time?
+	robot_pose_acquired = False
+	while not robot_pose_acquired:
+		try:
+			time.sleep(1.0) # TODO: does it need more time?
 		
-		now = rospy.Time.now()
+			now = rospy.Time.now()
 		
-		# Starting robot pose from Pose2D
-		starting_robot_position = (starting_robot_pose.x, starting_robot_pose.y, 0.0)
-		starting_robot_rotation = tf.transformations.quaternion_from_euler(0, 0, starting_robot_pose.theta)
+			# Starting robot pose from Pose2D
+			starting_robot_position = (starting_robot_pose.x, starting_robot_pose.y, 0.0)
+			starting_robot_rotation = tf.transformations.quaternion_from_euler(0, 0, starting_robot_pose.theta)
 		
-		# broadcast the robot frame relative to the marker
-		tf_broadcaster.sendTransform(starting_robot_position, starting_robot_rotation, now, "/actual_robot", "/world")
+			# broadcast the robot frame relative to the marker
+			tf_broadcaster.sendTransform(starting_robot_position, starting_robot_rotation, now, "/actual_robot", "/world")
 		
-		# receive the robot transform and compute the robot pose
-#		tf_listener.waitForTransform("/world", "/actual_robot", now, rospy.Duration(2.0))
-		time.sleep(0.1)
-		marker_to_robot_transform = tf_listener.lookupTransform("/robot_at_home", "/actual_robot", rospy.Time(0))
+			# receive the robot transform and compute the robot pose
+	#		tf_listener.waitForTransform("/world", "/actual_robot", now, rospy.Duration(2.0))
+			time.sleep(0.1)
+			marker_to_robot_transform = tf_listener.lookupTransform("/robot_at_home", "/actual_robot", rospy.Time(0))
 		
-		print  "marker-robot transform acquired: ", marker_to_robot_transform
-		
-	except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException), Argument:
-		rospy.loginfo("marker-robot transform not acquired") #TODO test
-		rospy.loginfo(Argument)
+			print  "marker-robot transform acquired: ", marker_to_robot_transform
+			
+			robot_pose_acquired = True
+			
+		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException), Argument:
+			robot_pose_acquired = False
+			rospy.loginfo("marker-robot transform not acquired") #TODO test
+			rospy.loginfo(Argument)
 	
 	# Wait for client
 	benchmark.WaitClient()
