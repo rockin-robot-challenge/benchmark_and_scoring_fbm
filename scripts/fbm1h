@@ -175,7 +175,8 @@ def main():
 	benchmark.End()
 
 	print score
-	time.sleep(10)
+#	time.sleep(10)
+	raw_input("press ENTER to close")
 				
 if __name__ == '__main__':
 	main()
