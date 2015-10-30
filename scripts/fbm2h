@@ -11,13 +11,6 @@ import tf
 from geometry_msgs.msg import Pose2D
 from rockin_scoring.BmBox import BmBox
 
-# mocap data received to get the latest pose available
-#last_robot_pose = None
-
-#def mocap_callback(pose):
-#	global last_robot_pose
-#	last_robot_pose = pose
-#	last_robot_pose_t = time.time()
 
 def main():
 	
@@ -28,8 +21,6 @@ def main():
 	# init tf and subscribers
 	tf_listener = tf.TransformListener()
 	tf_broadcaster = tf.TransformBroadcaster()
-#	mocap_sub = rospy.Subscriber("/fbm2h/robot_at_home/pose2d", Pose2D, mocap_callback)
-#	rospy.loginfo('subscribed to "/fbm2h/robot_at_home/pose2d"')
 	
 	# Get the parameters of the benchmark (waypoints, penalty_time, timeout_time)
 	starting_robot_pose = Pose2D(*rospy.get_param('goal/starting_pose'))
@@ -63,7 +54,7 @@ def main():
 	robot_pose_acquired = False
 	while not robot_pose_acquired:
 		try:
-			time.sleep(1.0) # TODO: does it need more time?
+			time.sleep(1.0)
 		
 			now = rospy.Time.now()
 		
@@ -75,7 +66,6 @@ def main():
 			tf_broadcaster.sendTransform(starting_robot_position, starting_robot_rotation, now, "/actual_robot", "/world")
 		
 			# receive the robot transform and compute the robot pose
-	#		tf_listener.waitForTransform("/world", "/actual_robot", now, rospy.Duration(2.0))
 			time.sleep(0.1)
 			marker_to_robot_transform = tf_listener.lookupTransform("/robot_at_home", "/actual_robot", rospy.Time(0))
 		
@@ -85,7 +75,7 @@ def main():
 			
 		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException), Argument:
 			robot_pose_acquired = False
-			rospy.loginfo("marker-robot transform not acquired") #TODO test
+			rospy.loginfo("marker-robot transform not acquired")
 			rospy.loginfo(Argument)
 	
 	# Wait for client
@@ -111,7 +101,7 @@ def main():
 		result = yaml.load(result_yaml)['reached_waypoint']
 		segments_detail[i]['result_payload'] = result_yaml
 		
-		if result != i: #TODO: what to do in such case?
+		if result != i:
 			rospy.loginfo( "WRONG WAYPOINT: %s received instead of %s" % (result, i) )
 			# continue #TODO: what to do in such case?
 		
@@ -136,7 +126,7 @@ def main():
 				
 				# receive the robot transform and compute the robot pose
 				tf_listener.waitForTransform("/world", "/actual_robot", now, rospy.Duration(1.0))
-				( (robot_x, robot_y, _), robot_rotation ) = tf_listener.lookupTransform("/world", "/actual_robot", rospy.Time(0)) #TODO: test
+				( (robot_x, robot_y, _), robot_rotation ) = tf_listener.lookupTransform("/world", "/actual_robot", rospy.Time(0))
 				(_, _, robot_theta) = tf.transformations.euler_from_quaternion(robot_rotation)
 				
 				robot_pose = Pose2D(robot_x, robot_y, robot_theta)
@@ -150,7 +140,7 @@ def main():
 			except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException), Argument:
 				robot_pose_acquired = False
 				rospy.loginfo("Robot pose not acquired")
-				rospy.loginfo(Argument) #TODO: test
+				rospy.loginfo(Argument)
 		
 		
 		if benchmark.Timeout():
@@ -230,7 +220,7 @@ def main():
 	score_yaml = yaml.dump(score, default_flow_style=False)
 	print score_yaml
 	
-	benchmark.SendScore(score_yaml) #TODO: it get stuck here
+	benchmark.SendScore(score_yaml)
 	
 	# Benchmark concluded
 	benchmark.End()
