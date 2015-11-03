@@ -10,73 +10,108 @@ import tf
 from rockin_scoring.BmBox import BmBox
 
 # Benchmark runs
-BENCHMARK_RUNS = 10
+BENCHMARK_RUNS = 5
 
-# Testbed size
-SIZE_X = 1
-SIZE_Y = 1
+# c times mean distance measurement error
+D_MIN = 0.002
 
-# Ground truth accuracy
-TRANS_ACCURACY = 0.0 # meters
-ROT_ACCURACY = 0.0 # degrees
+
+# Euclideandistance between Pose2D (p1, p2)
+def d(p1, p2):
+	return sqrt( (p1.x-p2.x)**2 + (p1.y-p2.y)**2 )
+
+# Look for the robot from GT system
+def acquire_robot_position():
+	robot_visible = False
+	while not robot_visible:
+		try:
+			((x, y, _), q) = listener.lookupTransform("/world", "/robot_at_work", rospy.Time(0))
+			(_, _, theta) = tf.transformations.euler_from_quaternion(q)
+			
+			return Pose2D(x, y, theta)
+
+			robot_visible = True #TODO: useles.
+			
+		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+			rospy.loginfo("Robot position couldn't be acquired, retrying...")
+			robot_visible = False
+	
+			listener.waitForTransform("/world", "/robot_at_work", rospy.Time(), rospy.Duration(2.0)) # TODO NOT GOOD FOR path sampling
+			
 
 def main():
 
 	# Init benchmarking node
 	benchmark = BmBox()
-	rospy.loginfo("FBM1W benchmarking node started")
+	rospy.loginfo("FBM3W benchmarking node started")
 	
 	# init tf
-	listener = tf.TransformListener()
-	br = tf.TransformBroadcaster()
+	tf_listener = tf.TransformListener()
+	tf_broadcaster = tf.TransformBroadcaster()
 
 	# Get items
-	items = rospy.get_param('items')
+	runs_specifications = rospy.get_param('runs_specifications')
 	
 	# Variables to compute score
-	runs = 0
-	class_positives = 0.0
-	instance_positives = 0.0
-	pose_score_sum = 0.0
-	execution_time = 0.0
-	
-	# Maximum pose error
-	max_pose_error = math.sqrt(math.pow(SIZE_X, 2) + math.pow(SIZE_Y, 2))
+	current_run = 0
 
 	# Wait for client
 	benchmark.WaitClient()
 
 	# Start the benchmark
-	while benchmark.Running():
-		runs = runs + 1
+	for run in runs_specifications:
+		# if the benchmark is not running, end the benchmark (i.e. CFH stopped the benchmark -> BmBoxState.END) TODO: verify
+		if not benchmark.Running(): break;
 		
-		# Wait for item_id from the refbox
-		print "Wait for item_instance from the CFH"
-		item_instance = benchmark.ManualOperation()
 		
-		if not benchmark.Running(): break
 		
-		print "Item: %s" % (item_instance)
+		### reference_position, robot and printed path positioning
+		
+		# TODO ? robot positioning as goal or as precondition
+	#	...
+		
+		# Acquire reference_position
+		
+		
+		# Wait for manual operation
+		rospy.loginf("Waiting for manual calibration of REFERENCE_POSITION of the printed path")
+		manual_operation_result_reference_position = benchmark.ManualOperation()
+		
+		# If the benchmark is not running, end the benchmark (i.e. CFH stopped the benchmark -> BmBoxState.END) TODO: verify
+		if not benchmark.Running(): break;
+		
+		
+		
+		### starting_position, robot and printed path positioning
+		
+		# Robot positioning as goal
+		benchmark.SendGoal("go to starting position")
+		goal_result_starting_position = benchmark.WaitResult()
+		
+		# Wait for manual operation
+		rospy.loginf("Waiting for manual calibration of STARTING_POSITION of the printed path")
+		manual_operation_result_starting_position = benchmark.ManualOperation()
+		
+		# If the benchmark is not running, end the benchmark (i.e. CFH stopped the benchmark -> BmBoxState.END) TODO: verify
+		if not benchmark.Running(): break;
+		
+		
+		
+		
 
-		# Pick the item from the list
-		item = [x for x in items if x['instance'] == item_instance][0]
-		
-		
-		print item_instance
-		print item
-
-		# Look for the ref board
-		ref_board_visible = False
-		while (not ref_board_visible):
+		# Look for the robot from GT system
+		robot_visible = False
+		while (not robot_visible):
 			try:
-				listener.lookupTransform("/origin", "/ref_board", rospy.Time(0))
-				ref_board_visible = True
+				listener.lookupTransform("/world", "/robot_at_work", rospy.Time(0))
+				robot_visible = True
 
 			except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-				rospy.logdebug("Reference board not visible")
+				rospy.loginfo("Reference board not visible")
 				time.sleep(1)
-				ref_board_visible = False
-				
+				robot_visible = False
+		
+		
 		# Send goal
 		benchmark.SendGoal()
 		start_time = time.time()
@@ -156,7 +191,9 @@ def main():
 		# Evaluate execution time
 		execution_time = execution_time + (end_time - start_time)
 
-		rospy.loginfo("Execution time - %f" % execution_time)
+		rospy.loginfo("Execution time of run %i: %f" % (runsexecution_time)
+		
+		current_run = current_run + 1
 
 	# Evaluate final score
 	score = {
