@@ -71,7 +71,7 @@ def main():
 	#	...
 		
 		# Acquire reference_position
-		
+		robot_reference_position = acquire_robot_position()
 		
 		# Wait for manual operation
 		rospy.loginf("Waiting for manual calibration of REFERENCE_POSITION of the printed path")
@@ -88,6 +88,9 @@ def main():
 		benchmark.SendGoal("go to starting position")
 		goal_result_starting_position = benchmark.WaitResult()
 		
+		# Acquire starting_position
+		robot_starting_position = acquire_robot_position()
+		
 		# Wait for manual operation
 		rospy.loginf("Waiting for manual calibration of STARTING_POSITION of the printed path")
 		manual_operation_result_starting_position = benchmark.ManualOperation()
@@ -97,28 +100,22 @@ def main():
 		
 		
 		
+		### path following
 		
-
-		# Look for the robot from GT system
-		robot_visible = False
-		while (not robot_visible):
-			try:
-				listener.lookupTransform("/world", "/robot_at_work", rospy.Time(0))
-				robot_visible = True
-
-			except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-				rospy.loginfo("Reference board not visible")
-				time.sleep(1)
-				robot_visible = False
+		# Start collecting robot positions
+	#	...
 		
+		# Robot starts path following as goal
+		benchmark.SendGoal("follow path")
 		
-		# Send goal
-		benchmark.SendGoal()
-		start_time = time.time()
+	#	start_time = time.time() #TODO needed? where?
 		
-		# Wait for result from client
-		result_yaml = benchmark.WaitResult()
-		end_time = time.time()
+		# Robot ends path following
+		goal_result_path_following = benchmark.WaitResult()
+		
+		# Ends collecting robot positions
+	#	...
+		
 		
 		if benchmark.Timeout():
 			print "TIMEOUT"
@@ -129,77 +126,19 @@ def main():
 			print "NOT RUNNING"
 			continue
 		
-		result = yaml.load(result_yaml)
-		
-		rospy.loginfo("Received result - Class: %s\tInstance: %s\tX: %f\tY: %f\tW: %f"
-			% (result['item_class'], result['item_instance'], result['x'], result['y'], result['theta']))
-		
-		result_trans = (result['x'], result['y'], 0)
-		result_rot = tf.transformations.quaternion_from_euler(0, 0, result['theta'] * math.pi / 180)
-		
-		# Evaluate class
-		if (result['item_class'] == item['class']):
-			class_positives = class_positives + 1
-			print ("class_positives = %d" % class_positives)
-		
-		# Evaluate instance
-		if (result['item_instance'] == item['instance']):
-			instance_positives = instance_positives + 1
-			print ("instance_positives = %d" % instance_positives)
-
-		# Evaluate position error
-		now = rospy.Time.now()
-		br.sendTransform(item['trans'], item['rot'], now, "item", "ref_board")
-		time.sleep(0.5)
-		br.sendTransform(result_trans, result_rot, now, "result_%d" % runs, "origin")
-		time.sleep(0.5)
-		
-		listener.waitForTransform("/origin", "/item", now, rospy.Duration(2.0))
-		
-		(trans, rot) = listener.lookupTransform("/origin", "/item", rospy.Time(0))		
-		euler = tf.transformations.euler_from_quaternion(rot)
-		
-		x_err = result['x'] - trans[0]
-		y_err = result['y'] - trans[1]
-		w_err = (result['theta'] - euler[2] * 180 / math.pi)
-
-		if w_err > 180: w_err = w_err - 360
-		if w_err < -180: w_err = w_err + 360
-
-		rospy.loginfo("Item received  - X: %2.5f\tY: %2.5f\tW: %3.2f"
-			% (result_trans[0], result_trans[1], result['theta']))
-		rospy.loginfo("Item acquired  - X: %2.5f\tY: %2.5f\tW: %3.2f"
-			% (trans[0], trans[1], euler[2] * 180 / math.pi))
-		rospy.loginfo("Error measured - X: %2.5f\tY: %2.5f\tW: %3.2f"
-			% (x_err, y_err, w_err))
-	
-		if abs(x_err) < TRANS_ACCURACY : x_err = 0
-		if abs(y_err) < TRANS_ACCURACY : y_err = 0
-		if abs(w_err) < ROT_ACCURACY : w_err = 0
-
-		pose_err_trans = math.sqrt(math.pow(x_err, 2) + math.pow(y_err, 2))
-		if pose_err_trans > max_pose_error : pose_err_trans = 1
-
-		pose_err_rot = abs(w_err) / 180
-		if pose_err_rot > 1 : pose_err_rot = 1
-		
-		pose_score = 1 - (pose_err_trans / 2) - (pose_err_rot / 2)
-		pose_score_sum = pose_score_sum + pose_score
-
-		rospy.loginfo("Position score - %f (%f | %f)" % (pose_score, 1 - pose_err_trans, 1 - pose_err_rot))
+		# Compute accuracy
+	#	...
 		
 		# Evaluate execution time
 		execution_time = execution_time + (end_time - start_time)
 
-		rospy.loginfo("Execution time of run %i: %f" % (runsexecution_time)
+		rospy.loginfo("Execution time of run %i: %f" % (current_run, execution_time)
 		
 		current_run = current_run + 1
 
 	# Evaluate final score
 	score = {
-		'class_accuracy': class_positives / runs,
-		'instance_accuracy': instance_positives / runs,
-		'pose_score': pose_score_sum / runs,
+		None, #TODO: per run details
 		'execution_time': execution_time
 
 	}
@@ -210,8 +149,8 @@ def main():
 	# Benchmark concluded
 	benchmark.End()
 
-	print score
-	time.sleep(10)
+	print score_yaml
+	time.sleep(100)
 				
 if __name__ == '__main__':
 	main()
