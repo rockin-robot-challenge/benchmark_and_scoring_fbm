@@ -25,8 +25,8 @@ def main():
 	# Get the parameters of the benchmark (waypoints, penalty_time, timeout_time)
 	starting_robot_pose = Pose2D(*rospy.get_param('goal/starting_pose'))
 	waypoints = rospy.get_param('goal/waypoints')
-	penalty_time = rospy.get_param('goal/penalty_time')
-	timeout_time = rospy.get_param('goal/timeout_time')
+#	penalty_time = rospy.get_param('goal/penalty_time')
+#	timeout_time = rospy.get_param('goal/timeout_time')
 	
 	rospy.set_param('goal/num_waypoints', len(waypoints))
 	
@@ -42,7 +42,7 @@ def main():
 	sum_sin = 0.0
 	sum_cos = 0.0
 	execution_time = 0.0 # [s]
-	penalties = 0
+#	penalties = 0
 	timeouts = 0
 	segments_detail = {}
 	
@@ -142,39 +142,49 @@ def main():
 				rospy.loginfo("Robot pose not acquired")
 				rospy.loginfo(Argument)
 		
-		
-		if benchmark.Timeout():
-			rospy.loginfo( "TIMEOUT" )
-			execution_time = execution_time + segment_time
+		# overall timeout (refBoxState.END and refbox_payload = "reason: timeout")
+		if benchmark.Timeout() and not benchmark.Running():
+			rospy.loginfo( "TIMEOUT AND NOT RUNNING" )
 			segments_detail[i]['refbox_timeout'] = True
-			continue
-		segments_detail[i]['refbox_timeout'] = False
-		
-		if not benchmark.Running():
-			rospy.loginfo( "NOT RUNNING" )
-			segments_detail[i]['refbox_not_running'] = True
-			continue
-		segments_detail[i]['refbox_not_running'] = False
-		
-		# Enforcing of rule: The maximum time allowed to the robot to go from each waypoint to the next waypoint, without penalization.
-		if segment_time > penalty_time:
-			rospy.loginfo( "PENALTY APPLIED ON THIS SEGMENT" )
-			penalties = penalties + 1
-			segments_detail[i]['penalty'] = True
-		else:
-			segments_detail[i]['penalty'] = False
-		
-		print segment_time, timeout_time
-		
-		# Enforcing of rule: If robots spent more time than this deadline when going from one waypoint to the next waypoint, they will not get points on that path. (assuming penalization from precedent rule is implied when this rule is enforced) 
-		if segment_time > timeout_time:
-			rospy.loginfo( "TIMEOUT ON THIS SEGMENT" )
 			execution_time = execution_time + segment_time
+			continue
+		else:
+			segments_detail[i]['refbox_timeout'] = False
+		
+		
+		# segment timeout (refBoxState.END and refbox_payload = "reason: timeout")
+		if benchmark.Timeout():
+			rospy.loginfo( "TIMEOUT ON THIS SEGMENT" )
 			timeouts = timeouts + 1
 			segments_detail[i]['timeout'] = True
-			i = i + 1
-			continue
-		segments_detail[i]['timeout'] = False
+		else:
+			segments_detail[i]['timeout'] = False
+		
+	#	if not benchmark.Running():
+	#		rospy.loginfo( "NOT RUNNING" )
+	#		segments_detail[i]['refbox_not_running'] = True
+	#		continue
+	#	segments_detail[i]['refbox_not_running'] = False
+		
+		# Enforcing of rule: The maximum time allowed to the robot to go from each waypoint to the next waypoint, without penalization.
+	#	if segment_time > penalty_time:
+	#		rospy.loginfo( "PENALTY APPLIED ON THIS SEGMENT" )
+	#		penalties = penalties + 1
+	#		segments_detail[i]['penalty'] = True
+	#	else:
+	#		segments_detail[i]['penalty'] = False
+		
+	#	print segment_time, timeout_time
+		
+		# Enforcing of rule: If robots spent more time than this deadline when going from one waypoint to the next waypoint, they will not get points on that path. (assuming penalization from precedent rule is implied when this rule is enforced) 
+	#	if segment_time > timeout_time:
+	#		rospy.loginfo( "TIMEOUT ON THIS SEGMENT" )
+	#		execution_time = execution_time + segment_time
+	#		timeouts = timeouts + 1
+	#		segments_detail[i]['timeout'] = True
+	#		i = i + 1
+	#		continue
+	#	segments_detail[i]['timeout'] = False
 		
 		# Evaluate position and orientation error between target pose (tp) and robot pose (rp)
 		rp = robot_pose	# robot position
@@ -209,7 +219,7 @@ def main():
 	score = {
 		'position_accuracy': position_accuracy,
 		'orientation_accuracy': orientation_accuracy,
-		'penalized_segments': penalties,
+#		'penalized_segments': penalties,
 		'timeout_segments': timeouts,
 		'execution_time': execution_time,
 		'hits': hits,

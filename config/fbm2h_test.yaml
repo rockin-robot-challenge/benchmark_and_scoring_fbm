@@ -10,4 +10,4 @@ goal:
   penalty_time:
     10.0
   timeout_time:
-    3600.0
+    5.0

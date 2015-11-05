@@ -2,7 +2,7 @@
 
 	<group ns="fbm2h">
 		
-		<rosparam file="$(find rockin_scoring)/config/fbm2h_test.yaml" command="load" />
+		<rosparam file="$(find rockin_scoring)/config/fbm2h.yaml" command="load" />
 		
 		<node name="bmbox"
 			pkg="rockin_scoring"
