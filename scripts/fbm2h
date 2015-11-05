@@ -48,7 +48,7 @@ def main():
 	
 	#raw_input("press ENTER to START")
 	
-	raw_input("press ENTER if the robot is posed on the start pose")
+#	raw_input("press ENTER if the robot is posed on the start pose")
 	
 	# Acquire the marker-robot transform
 	robot_pose_acquired = False
