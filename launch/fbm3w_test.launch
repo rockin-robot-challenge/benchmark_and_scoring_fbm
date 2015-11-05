@@ -48,7 +48,7 @@
 		
 		<node pkg="rosbag"
 			type="record"
-			name="log_fbmh2"
+			name="log_fbm3w"
 			args="record -o /home/rockin/logs/log_fbm3w
 				--split --duration=1h
 				/fbm3w/bmbox_state
