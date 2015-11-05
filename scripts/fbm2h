@@ -98,12 +98,12 @@ def main():
 		
 		# Wait for result from client
 		result_yaml	= benchmark.WaitResult()
-		result = yaml.load(result_yaml)['reached_waypoint']
+	#	result = yaml.load(result_yaml)
 		segments_detail[i]['result_payload'] = result_yaml
 		
-		if result != i:
-			rospy.loginfo( "WRONG WAYPOINT: %s received instead of %s" % (result, i) )
-			# continue #TODO: what to do in such case?
+	#	if result != i:
+	#		rospy.loginfo( "WRONG WAYPOINT: %s received instead of %s" % (result, i) )
+	#		# continue #TODO: what to do in such case?
 		
 		# Compute segment time
 		end_segment_time	= time.time()
@@ -204,7 +204,7 @@ def main():
 		# Update execution time
 		execution_time = execution_time + segment_time
 		
-		rospy.loginfo(" - result from client: %i\n - segment_time: %s\n - dinstance_error: %s\n - orientation_error: %s" % (result, segment_time, segments_detail[i]['dinstance_error'], segments_detail[i]['orientation_error']))
+		rospy.loginfo("\n\n - segment_time: %s\n - dinstance_error: %s\n - orientation_error: %s" % (segment_time, segments_detail[i]['dinstance_error'], segments_detail[i]['orientation_error']))
 		
 		i = i + 1
 		
