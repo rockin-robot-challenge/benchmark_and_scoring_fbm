@@ -16,7 +16,11 @@ BENCHMARK_RUNS = 5
 D_MIN = 0.002
 
 
-# Euclideandistance between Pose2D (p1, p2)
+# robot path
+robot_path = []
+
+
+# Euclidean distance between Pose2D (p1, p2)
 def d(p1, p2):
 	return sqrt( (p1.x-p2.x)**2 + (p1.y-p2.y)**2 )
 
@@ -25,7 +29,7 @@ def acquire_robot_position():
 	robot_visible = False
 	while not robot_visible:
 		try:
-			((x, y, _), q) = listener.lookupTransform("/world", "/robot_at_work", rospy.Time(0))
+			((x, y, _), q) = tf_listener.lookupTransform("/world", "/robot_at_work", rospy.Time(0))
 			(_, _, theta) = tf.transformations.euler_from_quaternion(q)
 			
 			return Pose2D(x, y, theta)
@@ -36,8 +40,38 @@ def acquire_robot_position():
 			rospy.loginfo("Robot position couldn't be acquired, retrying...")
 			robot_visible = False
 	
-			listener.waitForTransform("/world", "/robot_at_work", rospy.Time(), rospy.Duration(2.0)) # TODO NOT GOOD FOR path sampling
-			
+			tf_listener.waitForTransform("/world", "/robot_at_work", rospy.Time(), rospy.Duration(2.0)) # TODO NOT GOOD FOR path sampling
+
+# given a robot Pose2D relative to world, returns a Pose2D relative to robot_frame
+def translate_robot_pose(robot_pose2D):
+	try:
+		now = rospy.Time.now()
+	
+		qr = tf.transformations.quaternion_from_euler(0, 0, robot_pose2D.theta)
+		tf_broadcaster.sendTransform( (robot_pose2D.x, robot_pose2D.y, 0.0), qr, now, "/robot_in_frame", "/world")
+		tf_listener.waitForTransform("/robot_frame", "/robot_in_frame", now, rospy.Duration(2.0) ) #TODO: 2.0 too much, how short can it get
+		return tf_listener.lookupTransform("/robot_frame", "/robot_in_frame", now) # to obtain robot wrt path
+		
+	except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+		return None #TODO something about it
+	
+######## to publish robot_frame
+#	br.sendTransform(start_translation, ref_to_start_quaternion, now, "/robot_frame", "/world") ## constantly #TODO how?
+########	
+	
+
+def mocap_callback(pose):
+	global robot_path
+	if len(robot_path)>0:
+		if d(robot_path[-1], pose) >= D_MIN:
+			robot_path.append(pose)
+			print len(robot_path)
+			print pose
+	else:
+		robot_path.append(pose)
+		print len(robot_path)
+		print pose
+
 
 def main():
 
@@ -54,6 +88,7 @@ def main():
 	
 	# Variables to compute score
 	current_run = 0
+	execution_time = 0.0
 
 	# Wait for client
 	benchmark.WaitClient()
@@ -74,11 +109,11 @@ def main():
 		robot_reference_position = acquire_robot_position()
 		
 		# Wait for manual operation
-		rospy.loginf("Waiting for manual calibration of REFERENCE_POSITION of the printed path")
-		manual_operation_result_reference_position = benchmark.ManualOperation()
+	#	rospy.loginf("Waiting for manual calibration of REFERENCE_POSITION of the printed path")
+	#	benchmark.ManualOperation()
 		
 		# If the benchmark is not running, end the benchmark (i.e. CFH stopped the benchmark -> BmBoxState.END) TODO: verify
-		if not benchmark.Running(): break;
+	#	if not benchmark.Running(): break;
 		
 		
 		
@@ -86,44 +121,37 @@ def main():
 		
 		# Robot positioning as goal
 		benchmark.SendGoal("go to starting position")
-		goal_result_starting_position = benchmark.WaitResult()
+		benchmark.WaitResult()
 		
 		# Acquire starting_position
 		robot_starting_position = acquire_robot_position()
 		
 		# Wait for manual operation
 		rospy.loginf("Waiting for manual calibration of STARTING_POSITION of the printed path")
-		manual_operation_result_starting_position = benchmark.ManualOperation()
+		benchmark.ManualOperation()
 		
 		# If the benchmark is not running, end the benchmark (i.e. CFH stopped the benchmark -> BmBoxState.END) TODO: verify
 		if not benchmark.Running(): break;
-		
-		
-		robot_frame = (start_translation, ref_to_start_quaternion)
-		
-		
-		br.sendTransform(start_translation, ref_to_start_quaternion, now, "/robot_frame", "/world") ## constantly
-		
-		listener.lookupTransform("/robot_frame", "/robot_at_work", rospy.Time(0)) # to obtain robot wrt path
 		
 		
 		
 		### path following
 		
 		# Start collecting robot positions
-	#	...
+		mocap_subscriber = rospy.Subscriber("/fbm3w/robot_at_work/pose2d", Pose2D, mocap_callback)
+		rospy.loginfo('subscribed to "/fbm3w/robot_at_work/pose2d"')
 		
 		# Robot starts path following as goal
-		benchmark.SendGoal("follow path")
-		
-	#	start_time = time.time() #TODO needed? where?
+		benchmark.SendGoal("start path following")
+		start_time = time.time()
 		
 		# Robot ends path following
-		goal_result_path_following = benchmark.WaitResult()
+		benchmark.WaitResult()
+		end_time = time.time()
 		
 		# Ends collecting robot positions
-	#	...
-		
+		mocap_subscriber.unregister()
+		rospy.loginfo('UNsubscribed from "/fbm3w/robot_at_work/pose2d"')
 		
 		if benchmark.Timeout():
 			print "TIMEOUT"
@@ -148,7 +176,6 @@ def main():
 	score = {
 		None, #TODO: per run details
 		'execution_time': execution_time
-
 	}
 	
 	score_yaml = yaml.dump(score)
