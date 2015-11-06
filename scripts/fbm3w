@@ -19,6 +19,12 @@ D_MIN = 0.002
 # robot path
 robot_path = []
 
+# target path
+def line_path(l):
+	return (l/2, l/2)
+	
+def spline_path(l):
+	return (l**2/12, l)
 
 # Euclidean distance between Pose2D (p1, p2)
 def d(p1, p2):
@@ -59,7 +65,7 @@ def translate_robot_pose(robot_pose2D):
 #	br.sendTransform(start_translation, ref_to_start_quaternion, now, "/robot_frame", "/world") ## constantly #TODO how?
 ########	
 	
-
+# note: untracked path is ignored and will be evaluated as a step
 def mocap_callback(pose):
 	global robot_path
 	if len(robot_path)>0:
@@ -75,9 +81,11 @@ def mocap_callback(pose):
 
 def main():
 
+	time.sleep(5)
 	# Init benchmarking node
 	benchmark = BmBox()
 	rospy.loginfo("FBM3W benchmarking node started")
+	
 	
 	# init tf
 	tf_listener = tf.TransformListener()
@@ -94,11 +102,14 @@ def main():
 	benchmark.WaitClient()
 
 	# Start the benchmark
-	for run in runs_specifications:
+	for spec in runs_specifications:
 		# if the benchmark is not running, end the benchmark (i.e. CFH stopped the benchmark -> BmBoxState.END) TODO: verify
 		if not benchmark.Running(): break;
 		
-		
+		if spec == 'line':
+			target_path = line_path
+		if spec == 'spline':
+			target_path = spline_path
 		
 		### reference_position, robot and printed path positioning
 		
@@ -138,7 +149,10 @@ def main():
 		### path following
 		
 		# Start collecting robot positions
-		mocap_subscriber = rospy.Subscriber("/fbm3w/robot_at_work/pose2d", Pose2D, mocap_callback)
+		global robot_path
+		robot_path = []
+		
+		mocap_subscriber = rospy.Subscriber("/fbm3w/robot_at_work/pose2d", Pose2D, mocap_callback) #TODO: possible to check wether successful?
 		rospy.loginfo('subscribed to "/fbm3w/robot_at_work/pose2d"')
 		
 		# Robot starts path following as goal
@@ -149,7 +163,9 @@ def main():
 		benchmark.WaitResult()
 		end_time = time.time()
 		
-		# Ends collecting robot positions
+		#TODO: add last pose
+		
+		# End collecting robot positions
 		mocap_subscriber.unregister()
 		rospy.loginfo('UNsubscribed from "/fbm3w/robot_at_work/pose2d"')
 		
@@ -163,7 +179,17 @@ def main():
 			continue
 		
 		# Compute accuracy
-	#	...
+		l = 0.0
+		error_sum = 0.0
+		N = len(robot_path)
+		
+		for i in range(1, N):
+			l = l + d(robot_path[i-1], robot_path[i]) # TODO: translate to robot_frame
+			error_sum = error_sum + d(robot_path[i], target_path(l))
+			
+			print "l:%1.4f\t%1.2f"%(l, 1000*d(robot_path[i], target_path(l)))
+		
+		print error_sum / N
 		
 		# Evaluate execution time
 		execution_time = execution_time + (end_time - start_time)
@@ -174,7 +200,7 @@ def main():
 
 	# Evaluate final score
 	score = {
-		None, #TODO: per run details
+		best: None, #TODO: per run details
 		'execution_time': execution_time
 	}
 	
