@@ -8,7 +8,7 @@ import rospy
 from rockin_scoring.Client import Client
 
 benchmark = Client("client_test")
-rospy.loginfo("FBM1H client test node started")
+rospy.loginfo("FBM3W client test node started")
 
 # Connect to the refbox (check time sync, etc)
 benchmark.Connect()
@@ -20,7 +20,7 @@ while benchmark.Running():
 	print "<- RECEIVED GOAL", goal_yaml
 	
 	# Wait for manual confirmation to send reached_waypoint
-	raw_input("ready to send reached_waypoint: press ENTER")
+	raw_input("press ENTER")
 	benchmark.SendResult()
 	
 

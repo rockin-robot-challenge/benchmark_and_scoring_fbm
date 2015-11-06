@@ -30,7 +30,9 @@ def main():
 		runs = runs + 1
 		
 		rospy.loginfo("Wait for manual operation")
-		benchmark.ManualOperation()
+		benchmark.ManualOperation("")
+		
+		print "manual operation completed"
 
         #
         # TODO: Acquire first/calibration pose via the optitrack system

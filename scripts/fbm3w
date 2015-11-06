@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import math
+from math import sqrt
 import random
 import time
 import yaml
@@ -8,23 +9,26 @@ import yaml
 import rospy
 import tf
 from rockin_scoring.BmBox import BmBox
+from geometry_msgs.msg import Pose2D
 
 # Benchmark runs
 BENCHMARK_RUNS = 5
 
 # c times mean distance measurement error
-D_MIN = 0.002
-
+D_MIN = 0.01
 
 # robot path
 robot_path = []
 
 # target path
 def line_path(l):
-	return (l/2, l/2)
-	
+	return Pose2D(l/2, l/2, 0)
+
 def spline_path(l):
-	return (l**2/12, l)
+	return Pose2D(l**2/12, l, 0)
+
+tf_listener = None
+tf_broadcaster = None
 
 # Euclidean distance between Pose2D (p1, p2)
 def d(p1, p2):
@@ -32,6 +36,7 @@ def d(p1, p2):
 
 # Look for the robot from GT system
 def acquire_robot_position():
+	global tf_listener
 	robot_visible = False
 	while not robot_visible:
 		try:
@@ -80,14 +85,15 @@ def mocap_callback(pose):
 
 
 def main():
-
-	time.sleep(5)
+	
 	# Init benchmarking node
 	benchmark = BmBox()
 	rospy.loginfo("FBM3W benchmarking node started")
 	
 	
 	# init tf
+	global tf_listener
+	global tf_broadcaster
 	tf_listener = tf.TransformListener()
 	tf_broadcaster = tf.TransformBroadcaster()
 
@@ -100,48 +106,47 @@ def main():
 
 	# Wait for client
 	benchmark.WaitClient()
+		
+	### reference_position, robot and printed path positioning
+	
+	# TODO ? robot positioning as goal or as precondition
+#	...
+	
+	# Acquire reference_position
+	robot_reference_position = acquire_robot_position()
+	rospy.loginfo("Acquired reference_position\n%s", robot_reference_position)
+	
+	# Wait for manual operation
+#	rospy.loginfo("Waiting for manual calibration of REFERENCE_POSITION of the printed path")
+#	benchmark.ManualOperation()
+		
 
 	# Start the benchmark
-	for spec in runs_specifications:
-		# if the benchmark is not running, end the benchmark (i.e. CFH stopped the benchmark -> BmBoxState.END) TODO: verify
-		if not benchmark.Running(): break;
+	while benchmark.Running() and current_run < BENCHMARK_RUNS:
 		
+		spec = runs_specifications[current_run]
 		if spec == 'line':
 			target_path = line_path
 		if spec == 'spline':
 			target_path = spline_path
 		
-		### reference_position, robot and printed path positioning
-		
-		# TODO ? robot positioning as goal or as precondition
-	#	...
-		
-		# Acquire reference_position
-		robot_reference_position = acquire_robot_position()
-		
-		# Wait for manual operation
-	#	rospy.loginf("Waiting for manual calibration of REFERENCE_POSITION of the printed path")
-	#	benchmark.ManualOperation()
-		
-		# If the benchmark is not running, end the benchmark (i.e. CFH stopped the benchmark -> BmBoxState.END) TODO: verify
-	#	if not benchmark.Running(): break;
-		
-		
 		
 		### starting_position, robot and printed path positioning
 		
 		# Robot positioning as goal
+		
 		benchmark.SendGoal("go to starting position")
 		benchmark.WaitResult()
 		
+		if current_run == 0:
+			# Wait for manual operation
+			rospy.loginfo("Waiting for manual calibration of STARTING_POSITION of the printed path")
+			benchmark.ManualOperation()
+		
 		# Acquire starting_position
 		robot_starting_position = acquire_robot_position()
+		rospy.loginfo("Acquired starting_position\n%s", robot_starting_position)
 		
-		# Wait for manual operation
-		rospy.loginf("Waiting for manual calibration of STARTING_POSITION of the printed path")
-		benchmark.ManualOperation()
-		
-		# If the benchmark is not running, end the benchmark (i.e. CFH stopped the benchmark -> BmBoxState.END) TODO: verify
 		if not benchmark.Running(): break;
 		
 		
@@ -194,7 +199,7 @@ def main():
 		# Evaluate execution time
 		execution_time = execution_time + (end_time - start_time)
 
-		rospy.loginfo("Execution time of run %i: %f" % (current_run, execution_time)
+		rospy.loginfo("Execution time of run %i: %f" % (current_run, execution_time))
 		
 		current_run = current_run + 1
 
