@@ -17,7 +17,7 @@ while (benchmark.Running()):
 	op = benchmark.RequestedManualOperation()
 	if op != False:
 		print op
-		raw_input("FIRST manual operation was requested; press ENTER")
+	#	raw_input("FIRST manual operation was requested; press ENTER")
 		benchmark.ConfirmManualOperation()
 	
 	time.sleep(1)

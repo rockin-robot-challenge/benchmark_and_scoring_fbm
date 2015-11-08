@@ -1,6 +1,6 @@
 runs_specifications:
   - 'line'
-  - 'line'
   - 'spline'
+  - 'line'
   - 'spline'
   - 'line'

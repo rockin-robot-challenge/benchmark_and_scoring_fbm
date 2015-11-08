@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import math
-from math import sqrt
+from math import sqrt, sin, cos, pi
 import random
 import time
 import yaml
@@ -15,17 +15,24 @@ from geometry_msgs.msg import Pose2D
 BENCHMARK_RUNS = 5
 
 # c times mean distance measurement error
-D_MIN = 0.01
+D_MIN = 0.005
 
 # robot path
 robot_path = []
 
-# target path
+# target paths
 def line_path(l):
-	return Pose2D(l/2, l/2, 0)
+	l = float(l)
+	return Pose2D(0.30*l, 0.10*l, 0) # line from (0, 0) to (30, 10) [cm]
 
-def spline_path(l):
+def parabola_path(l):
+	l = float(l)
 	return Pose2D(l**2/12, l, 0)
+def semi_ellipse(l):
+	l = float(l)
+	return Pose2D(0.050 - 0.050*cos(pi*l), 0.048*sin(pi*l), 0) # semi ellipse (0,0),(5, 4.8), (10, 0) [cm]
+
+spline_path = semi_ellipse
 
 tf_listener = None
 tf_broadcaster = None
@@ -37,38 +44,42 @@ def d(p1, p2):
 # Look for the robot from GT system
 def acquire_robot_position():
 	global tf_listener
-	robot_visible = False
-	while not robot_visible:
+	
+	while True:
 		try:
 			((x, y, _), q) = tf_listener.lookupTransform("/world", "/robot_at_work", rospy.Time(0))
 			(_, _, theta) = tf.transformations.euler_from_quaternion(q)
 			
 			return Pose2D(x, y, theta)
-
-			robot_visible = True #TODO: useles.
 			
 		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-			rospy.loginfo("Robot position couldn't be acquired, retrying...")
-			robot_visible = False
-	
-			tf_listener.waitForTransform("/world", "/robot_at_work", rospy.Time(), rospy.Duration(2.0)) # TODO NOT GOOD FOR path sampling
+			rospy.loginfo("Position couldn't be acquired, retrying...")
+			tf_listener.waitForTransform("/world", "/robot_at_work", rospy.Time(), rospy.Duration(2.0))
 
 # given a robot Pose2D relative to world, returns a Pose2D relative to robot_frame
 def translate_robot_pose(robot_pose2D):
+	global tf_listener, tf_broadcaster, robot_reference_position, robot_starting_position, ref_to_start_quaternion
+	
 	try:
 		now = rospy.Time.now()
-	
-		qr = tf.transformations.quaternion_from_euler(0, 0, robot_pose2D.theta)
-		tf_broadcaster.sendTransform( (robot_pose2D.x, robot_pose2D.y, 0.0), qr, now, "/robot_in_frame", "/world")
+		
+		# broadcast robot_frame
+		tf_broadcaster.sendTransform((robot_starting_position.x, robot_starting_position.y, 0), ref_to_start_quaternion, now, "/robot_frame", "/world")
+		
+		# broadcast robot position and lookup robot position in robot_frame
+		tf_broadcaster.sendTransform( (robot_pose2D.x, robot_pose2D.y, 0.0), (0,0,0,1), now, "/robot_in_frame", "/world")
+		
 		tf_listener.waitForTransform("/robot_frame", "/robot_in_frame", now, rospy.Duration(2.0) ) #TODO: 2.0 too much, how short can it get
-		return tf_listener.lookupTransform("/robot_frame", "/robot_in_frame", now) # to obtain robot wrt path
+		((x, y, _), _) = tf_listener.lookupTransform("/robot_frame", "/robot_in_frame", now) # to obtain robot wrt path
+		
+		return Pose2D(x, y, 0)
 		
 	except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
 		return None #TODO something about it
-	
-######## to publish robot_frame
-#	br.sendTransform(start_translation, ref_to_start_quaternion, now, "/robot_frame", "/world") ## constantly #TODO how?
-########	
+
+
+def broadcast_pose2D(pose2D, timestamp, child, parent):
+	tf_broadcaster.sendTransform( (pose2D.x, pose2D.y, 0.0), (0,0,0,1), timestamp, child, parent)
 	
 # note: untracked path is ignored and will be evaluated as a step
 def mocap_callback(pose):
@@ -76,12 +87,12 @@ def mocap_callback(pose):
 	if len(robot_path)>0:
 		if d(robot_path[-1], pose) >= D_MIN:
 			robot_path.append(pose)
-			print len(robot_path)
-			print pose
+	#		print len(robot_path)
+	#		print pose
 	else:
 		robot_path.append(pose)
-		print len(robot_path)
-		print pose
+	#	print len(robot_path)
+	#	print pose
 
 
 def main():
@@ -102,27 +113,24 @@ def main():
 	
 	# Variables to compute score
 	current_run = 0
+	best_run = None
+	best_distance_error = None
 	execution_time = 0.0
+	runs_details = {}
 
 	# Wait for client
 	benchmark.WaitClient()
 		
 	### reference_position, robot and printed path positioning
 	
-	# TODO ? robot positioning as goal or as precondition
-#	...
-	
 	# Acquire reference_position
+	global robot_reference_position
 	robot_reference_position = acquire_robot_position()
 	rospy.loginfo("Acquired reference_position\n%s", robot_reference_position)
 	
-	# Wait for manual operation
-#	rospy.loginfo("Waiting for manual calibration of REFERENCE_POSITION of the printed path")
-#	benchmark.ManualOperation()
-		
-
 	# Start the benchmark
 	while benchmark.Running() and current_run < BENCHMARK_RUNS:
+		runs_details[current_run] = {}
 		
 		spec = runs_specifications[current_run]
 		if spec == 'line':
@@ -130,11 +138,11 @@ def main():
 		if spec == 'spline':
 			target_path = spline_path
 		
+		runs_details[current_run]['spec'] = spec
 		
 		### starting_position, robot and printed path positioning
 		
 		# Robot positioning as goal
-		
 		benchmark.SendGoal("go to starting position")
 		benchmark.WaitResult()
 		
@@ -144,8 +152,29 @@ def main():
 			benchmark.ManualOperation()
 		
 		# Acquire starting_position
+		global robot_starting_position
+		global ref_to_start_quaternion
 		robot_starting_position = acquire_robot_position()
 		rospy.loginfo("Acquired starting_position\n%s", robot_starting_position)
+		
+		# compute ref_to_start_quaternion
+		
+		now = rospy.Time.now()
+		
+		# broadcast ref and start positions
+		broadcast_pose2D(robot_reference_position, now, "/reference_position", "/world")
+		broadcast_pose2D(robot_starting_position, now, "/starting_position", "/world")
+		
+		tf_listener.waitForTransform("/reference_position", "/starting_position", now, rospy.Duration(2.0) )
+		(_, ref_to_start_quaternion) = tf_listener.lookupTransform("/reference_position", "/starting_position", now)
+		
+		#TODO ref_to_start_quaternion is wrong
+		
+		print "ref_to_start_quaternion.yaw"
+		print tf.transformations.euler_from_quaternion(ref_to_start_quaternion)[2]
+		
+		print "translate_robot_pose(starting_position) == 0"
+		print translate_robot_pose(robot_starting_position)
 		
 		if not benchmark.Running(): break;
 		
@@ -157,7 +186,7 @@ def main():
 		global robot_path
 		robot_path = []
 		
-		mocap_subscriber = rospy.Subscriber("/fbm3w/robot_at_work/pose2d", Pose2D, mocap_callback) #TODO: possible to check wether successful?
+		mocap_subscriber = rospy.Subscriber("/fbm3w/robot_at_work/pose2d", Pose2D, mocap_callback)
 		rospy.loginfo('subscribed to "/fbm3w/robot_at_work/pose2d"')
 		
 		# Robot starts path following as goal
@@ -183,30 +212,52 @@ def main():
 			print "NOT RUNNING"
 			continue
 		
-		# Compute accuracy
-		l = 0.0
-		error_sum = 0.0
-		N = len(robot_path)
-		
-		for i in range(1, N):
-			l = l + d(robot_path[i-1], robot_path[i]) # TODO: translate to robot_frame
-			error_sum = error_sum + d(robot_path[i], target_path(l))
-			
-			print "l:%1.4f\t%1.2f"%(l, 1000*d(robot_path[i], target_path(l)))
-		
-		print error_sum / N
 		
 		# Evaluate execution time
 		execution_time = execution_time + (end_time - start_time)
 
 		rospy.loginfo("Execution time of run %i: %f" % (current_run, execution_time))
+		runs_details[current_run]['execution_time'] = end_time - start_time
+		
+		# Compute accuracy
+		l = 0.0
+		error_sum = 0.0
+		N = len(robot_path)
+		
+		# compute total robot_path length
+		L = 0.0
+		for i in range(1, N): L = L + d(robot_path[i-1], robot_path[i])
+		
+		for i in range(1, N):
+			robot_in_frame_pose = translate_robot_pose(robot_path[i])
+			
+			l = l + d(robot_path[i-1], robot_path[i])
+			error_sum = error_sum + d(robot_in_frame_pose, target_path(l/L))
+			
+			print "l/L:%1.4f\t%1.2f"%(l/L, 1000*d(robot_in_frame_pose, target_path(l/L)))
+			
+			broadcast_pose2D(robot_in_frame_pose, rospy.Time.now(), "my_robot_in_frame"+str(i), "/world")
+			broadcast_pose2D(target_path(l/L), rospy.Time.now(), "my_target_path"+str(i), "/world")
+		
+		distance_error = error_sum / N
+		
+		rospy.loginfo("Distance error of run %i: %f" % (current_run, distance_error))
+		runs_details[current_run]['distance_error'] = distance_error
+		
+		if best_run == None or distance_error < best_distance_error:
+			best_run = current_run
+			best_distance_error = distance_error
 		
 		current_run = current_run + 1
 
 	# Evaluate final score
+	
+	
 	score = {
-		best: None, #TODO: per run details
-		'execution_time': execution_time
+		'best_distance_error': best_distance_error,
+		'best_run': best_run,
+		'execution_time': execution_time,
+		'runs_details': runs_details
 	}
 	
 	score_yaml = yaml.dump(score)
@@ -216,7 +267,7 @@ def main():
 	benchmark.End()
 
 	print score_yaml
-	time.sleep(100)
+	raw_input("press ENTER to close")
 				
 if __name__ == '__main__':
 	main()
