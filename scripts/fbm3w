@@ -58,7 +58,7 @@ def acquire_robot_position():
 
 # given a robot Pose2D relative to world, returns a Pose2D relative to robot_frame
 def translate_robot_pose(robot_pose2D):
-	global tf_listener, tf_broadcaster, robot_reference_position, robot_starting_position, ref_to_start_quaternion
+	global tf_listener, tf_broadcaster, robot_starting_position, ref_to_start_quaternion
 	while True:
 		try:
 			now = rospy.Time.now()
@@ -78,10 +78,48 @@ def translate_robot_pose(robot_pose2D):
 			rospy.loginfo("Transform couldn't be computed, retrying...")
 			# return None
 
-
 def broadcast_pose2D(pose2D, timestamp, child, parent):
 	tf_broadcaster.sendTransform( (pose2D.x, pose2D.y, 0.0), (0,0,0,1), timestamp, child, parent)
+
+
+
+#### benchmark functions ####
+
+### Acquire reference_position
+def acquire_reference_position():
+	global robot_reference_position
+	robot_reference_position = acquire_robot_position()
+	rospy.loginfo("Acquired reference_position\n%s", robot_reference_position)
+
+### Acquire starting_position
+def acquire_starting_position():
+	global robot_starting_position
+	robot_starting_position = acquire_robot_position()
+	rospy.loginfo("Acquired starting_position\n%s", robot_starting_position)
+
+### Updates ref_to_start_quaternion, so that robot_frame will be rotated as robot_starting_position - robot_reference_position
+def update_robot_frame():
+	global robot_reference_position, robot_starting_position, ref_to_start_quaternion
+	ref_to_start_vector = (robot_starting_position.y - robot_reference_position.y, robot_starting_position.x - robot_reference_position.x)
+	ref_to_start_quaternion = tf.transformations.quaternion_from_euler(0, 0, atan2(*ref_to_start_vector))
 	
+	print "robot_frame theta: ", atan2(*ref_to_start_vector)/pi*180
+
+
+### Start collecting robot positions
+def start_collecting_robot_path():
+	global robot_path, mocap_subscriber
+	robot_path = []
+	
+	mocap_subscriber = rospy.Subscriber("/fbm3w/robot_at_work/pose2d", Pose2D, mocap_callback)
+	rospy.loginfo('subscribed to "/fbm3w/robot_at_work/pose2d"')
+
+### End collecting robot positions
+def end_collecting_robot_path():
+	global mocap_subscriber
+	mocap_subscriber.unregister()
+	rospy.loginfo('UNsubscribed from "/fbm3w/robot_at_work/pose2d"')
+
 # note: untracked path is ignored and will be evaluated as a step
 def mocap_callback(pose):
 	global robot_path
@@ -121,9 +159,10 @@ def main():
 	### reference_position, robot and printed path positioning
 	
 	# Acquire reference_position
-	global robot_reference_position
-	robot_reference_position = acquire_robot_position()
-	rospy.loginfo("Acquired reference_position\n%s", robot_reference_position)
+#	global robot_reference_position
+#	robot_reference_position = acquire_robot_position()
+#	rospy.loginfo("Acquired reference_position\n%s", robot_reference_position)
+	
 	
 	# Start the benchmark
 	while benchmark.Running() and current_run < BENCHMARK_RUNS:
@@ -136,55 +175,62 @@ def main():
 			target_path = spline_path
 		
 		runs_details[current_run]['spec'] = spec
+		rospy.loginfo("run spec: %s", spec)
 		
 		### starting_position, robot and printed path positioning
 		
 		# Robot positions in start position
 		benchmark.ManualOperation()
 		
-		# Acquire starting_position
-		global robot_starting_position
-		global ref_to_start_quaternion
-		
-		if current_run == 0:
-			robot_starting_position = acquire_robot_position()
-			rospy.loginfo("Acquired starting_position\n%s", robot_starting_position)
-		
-			# compute robot_frame rotation
-			ref_to_start_vector = (robot_starting_position.y - robot_reference_position.y, robot_starting_position.x - robot_reference_position.x)
-			ref_to_start_quaternion = tf.transformations.quaternion_from_euler(0, 0, atan2(*ref_to_start_vector))
-			
-			print "robot_frame"
-			print "dx: ", robot_starting_position.x - robot_reference_position.x
-			print "dy: ", robot_starting_position.y - robot_reference_position.y
-			
-			print "theta: ", atan2(*ref_to_start_vector)/pi*180
+		acquire_reference_position()
 		
 		if not benchmark.Running(): break;
+		
+		# Acquire starting_position
+	#	global robot_starting_position
+	#	global ref_to_start_quaternion
+		
+	#	robot_starting_position = acquire_robot_position()
+	#	rospy.loginfo("Acquired starting_position\n%s", robot_starting_position)
+		
+		# compute robot_frame rotation
+	#	ref_to_start_vector = (robot_starting_position.y - robot_reference_position.y, robot_starting_position.x - robot_reference_position.x)
+	#	ref_to_start_quaternion = tf.transformations.quaternion_from_euler(0, 0, atan2(*ref_to_start_vector))
+		
+	#	print "robot_frame"
+	#	print "dx: ", robot_starting_position.x - robot_reference_position.x
+	#	print "dy: ", robot_starting_position.y - robot_reference_position.y
+	#	
+	#	print "theta: ", atan2(*ref_to_start_vector)/pi*180
+	#	
+	#	if not benchmark.Running(): break;
 		
 		
 		
 		### path following
 		
-		# Start collecting robot positions
-		global robot_path
-		robot_path = []
-		
-		mocap_subscriber = rospy.Subscriber("/fbm3w/robot_at_work/pose2d", Pose2D, mocap_callback)
-		rospy.loginfo('subscribed to "/fbm3w/robot_at_work/pose2d"')
+	#	# Start collecting robot positions
+	#	global robot_path
+	#	robot_path = []
+	#	
+	#	mocap_subscriber = rospy.Subscriber("/fbm3w/robot_at_work/pose2d", Pose2D, mocap_callback)
+	#	rospy.loginfo('subscribed to "/fbm3w/robot_at_work/pose2d"')
 		
 		# Robot starts path following as goal
 		benchmark.SendGoal("start path following")
 		start_time = time.time()
 		
+		start_collecting_robot_path()
+		
 		# Robot ends path following
 		benchmark.WaitResult()
 		end_time = time.time()
 		
+		end_collecting_robot_path()
 		
-		# End collecting robot positions
-		mocap_subscriber.unregister()
-		rospy.loginfo('UNsubscribed from "/fbm3w/robot_at_work/pose2d"')
+	#	# End collecting robot positions
+	#	mocap_subscriber.unregister()
+	#	rospy.loginfo('UNsubscribed from "/fbm3w/robot_at_work/pose2d"')
 		
 		if benchmark.Timeout():
 			print "TIMEOUT"
@@ -203,6 +249,9 @@ def main():
 		runs_details[current_run]['execution_time'] = end_time - start_time
 		
 		# Compute accuracy
+		
+		global robot_path
+		
 		l = 0.0
 		error_sum = 0.0
 		N = len(robot_path)
@@ -219,8 +268,8 @@ def main():
 			
 			print "l/L:%1.4f\t%1.2f"%(l/L, 1000*d(robot_in_frame_pose, target_path(l/L)))
 			
-		#	broadcast_pose2D(robot_in_frame_pose, rospy.Time.now(), "my_robot_in_frame"+str(i), "/world")
-		#	broadcast_pose2D(target_path(l/L), rospy.Time.now(), "my_target_path"+str(i), "/world")
+			broadcast_pose2D(robot_in_frame_pose, rospy.Time.now(), "my_robot_in_frame"+str(i), "/world")
+			broadcast_pose2D(target_path(l/L), rospy.Time.now(), "my_target_path"+str(i), "/world")
 		
 		distance_error = error_sum / N
 		
@@ -232,10 +281,9 @@ def main():
 			best_distance_error = distance_error
 		
 		current_run = current_run + 1
-
+	
+	
 	# Evaluate final score
-	
-	
 	score = {
 		'best_distance_error': best_distance_error,
 		'best_run': best_run,

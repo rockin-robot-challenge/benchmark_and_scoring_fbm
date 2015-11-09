@@ -6,7 +6,7 @@
 		
 		<node name="bmbox"
 			pkg="rockin_scoring"
-			type="fbm3w_suggested"
+			type="fbm3w"
 			output="screen"
 			launch-prefix="gnome-terminal -e"
 		/>
