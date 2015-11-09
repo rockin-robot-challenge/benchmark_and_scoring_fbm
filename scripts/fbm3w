@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import math
-from math import sqrt, sin, cos, pi
+from math import sqrt, sin, cos, pi, atan2
 import random
 import time
 import yaml
@@ -75,6 +75,7 @@ def translate_robot_pose(robot_pose2D):
 		return Pose2D(x, y, 0)
 		
 	except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+		rospy.loginfo("Transform couldn't be computed, retrying...")
 		return None #TODO something about it
 
 
@@ -162,17 +163,19 @@ def main():
 		now = rospy.Time.now()
 		
 		# broadcast ref and start positions
-		broadcast_pose2D(robot_reference_position, now, "/reference_position", "/world")
-		broadcast_pose2D(robot_starting_position, now, "/starting_position", "/world")
+		#broadcast_pose2D(robot_reference_position, now, "/reference_position", "/world")
+		#broadcast_pose2D(robot_starting_position, now, "/starting_position", "/world")
 		
-		tf_listener.waitForTransform("/reference_position", "/starting_position", now, rospy.Duration(2.0) )
-		(_, ref_to_start_quaternion) = tf_listener.lookupTransform("/reference_position", "/starting_position", now)
+		#tf_listener.waitForTransform("/reference_position", "/starting_position", now, rospy.Duration(2.0) )
+		#(_, ref_to_start_quaternion) = tf_listener.lookupTransform("/reference_position", "/starting_position", now)
 		
 		#TODO ref_to_start_quaternion is wrong
-		(dx, dy, _) = robot_starting_position - robot_reference_position
-		print "dx, dy: ", dx, dy
-		tf.transformations.quaternion_from_euler(0, 0, atan2(dy, dx))
-		print "atan2(dy, dx) ", atan2(dy, dx)
+		ref_to_start_vector = (robot_starting_position.y - robot_reference_position.y, robot_starting_position.x - robot_reference_position.x)
+		
+		ref_to_start_quaternion = tf.transformations.quaternion_from_euler(0, 0, atan2(*ref_to_start_vector))
+		
+		print "dx, dy: ", ref_to_start_vector[1], ref_to_start_vector[0]
+		print "atan2(dy, dx) ", atan2(*ref_to_start_vector)
 		
 		print "ref_to_start_quaternion."
 		print ref_to_start_quaternion
