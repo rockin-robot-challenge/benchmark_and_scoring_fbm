@@ -169,7 +169,15 @@ def main():
 		(_, ref_to_start_quaternion) = tf_listener.lookupTransform("/reference_position", "/starting_position", now)
 		
 		#TODO ref_to_start_quaternion is wrong
+		(dx, dy, _) = robot_starting_position - robot_reference_position
+		print "dx, dy: ", dx, dy
+		tf.transformations.quaternion_from_euler(0, 0, atan2(dy, dx))
+		print "atan2(dy, dx) ", atan2(dy, dx)
 		
+		print "ref_to_start_quaternion."
+		print ref_to_start_quaternion
+		print "ref_to_start_quaternion.euler"
+		print tf.transformations.euler_from_quaternion(ref_to_start_quaternion)
 		print "ref_to_start_quaternion.yaw"
 		print tf.transformations.euler_from_quaternion(ref_to_start_quaternion)[2]
 		
