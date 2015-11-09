@@ -20,6 +20,8 @@ D_MIN = 0.00033 # reasonable with a smoothing value of 15
 # robot path
 robot_path = []
 
+
+
 # target paths
 def line_path(l):
 	l = float(l)
@@ -62,16 +64,16 @@ def translate_robot_pose(robot_pose2D):
 	while True:
 		try:
 			now = rospy.Time.now()
-		
+			
 			# broadcast robot_frame
 			tf_broadcaster.sendTransform((robot_starting_position.x, robot_starting_position.y, 0), ref_to_start_quaternion, now, "/robot_frame", "/world")
-		
+			
 			# broadcast robot position and lookup robot position in robot_frame
 			tf_broadcaster.sendTransform( (robot_pose2D.x, robot_pose2D.y, 0.0), (0,0,0,1), now, "/robot_in_frame", "/world")
-		
+			
 			tf_listener.waitForTransform("/robot_frame", "/robot_in_frame", now, rospy.Duration(2.0) )
 			((x, y, _), _) = tf_listener.lookupTransform("/robot_frame", "/robot_in_frame", now) # to obtain robot wrt path
-		
+			
 			return Pose2D(x, y, 0)
 		
 		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
@@ -220,6 +222,11 @@ def main():
 		benchmark.SendGoal("start path following")
 		start_time = time.time()
 		
+		### test
+		time.sleep(2)
+		
+		acquire_starting_position()
+		update_robot_frame()
 		start_collecting_robot_path()
 		
 		# Robot ends path following
