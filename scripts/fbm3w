@@ -41,11 +41,11 @@ spline_path = semi_ellipse
 tf_listener = None
 tf_broadcaster = None
 
-# Euclidean distance between Pose2D (p1, p2)
+### Euclidean distance between Pose2D (p1, p2)
 def d(p1, p2):
 	return sqrt( (p1.x-p2.x)**2 + (p1.y-p2.y)**2 )
 
-# Look for the robot from GT system
+### Look for the robot from GT system
 def acquire_robot_position():
 	global tf_listener
 	
@@ -60,7 +60,7 @@ def acquire_robot_position():
 			rospy.loginfo("Position couldn't be acquired, retrying...")
 			tf_listener.waitForTransform("/world", "/robot_at_work", rospy.Time(), rospy.Duration(2.0))
 
-# given a robot Pose2D relative to world, returns a Pose2D relative to robot_frame
+### given a robot Pose2D relative to world, returns a Pose2D relative to robot_frame
 def translate_robot_pose(robot_pose2D):
 	global tf_listener, tf_broadcaster, robot_starting_position, ref_to_start_quaternion
 	while True:
@@ -82,9 +82,6 @@ def translate_robot_pose(robot_pose2D):
 			rospy.loginfo("Transform couldn't be computed, retrying...")
 			# return None
 
-def broadcast_pose2D(pose2D, timestamp, child, parent):
-	tf_broadcaster.sendTransform( (pose2D.x, pose2D.y, 0.0), (0,0,0,1), timestamp, child, parent)
-
 def pose2D_to_pose(pose2D):
 	ps = PoseStamped()
 	p = Pose()
@@ -93,10 +90,15 @@ def pose2D_to_pose(pose2D):
 	ps.pose = p
 	return ps
 
+def broadcast_pose2D(pose2D, timestamp, child, parent):
+	tf_broadcaster.sendTransform( (pose2D.x, pose2D.y, 0.0), (0,0,0,1), timestamp, child, parent)
 
-#############################
-#### benchmark functions ####
-#############################
+
+
+
+###############################
+####  benchmark functions  ####
+###############################
 
 ### Acquire reference_position
 def acquire_reference_position():
@@ -157,7 +159,6 @@ def mocap_callback(pose):
 
 
 def main():
-	
 	# Init benchmarking node
 	benchmark = BmBox()
 	rospy.loginfo("FBM3W benchmarking node started")
@@ -170,7 +171,7 @@ def main():
 	robot_path_publisher = rospy.Publisher('/fbm3w/robot_path_in_frame', Path, queue_size=10)
 	target_path_publisher = rospy.Publisher('/fbm3w/target_path_in_frame', Path, queue_size=10)
 
-	# Get items
+	# Get params (list of line/spline for each run)
 	runs_specifications = rospy.get_param('runs_specifications')
 	
 	# Variables to compute score
@@ -197,7 +198,7 @@ def main():
 		rospy.loginfo("run spec: %s", spec)
 		
 		
-		# Robot positions in start position
+		# Robot positions in reference position, in its frame (robot_frame)
 		benchmark.ManualOperation()
 		
 		acquire_reference_position()
@@ -205,19 +206,23 @@ def main():
 		if not benchmark.Running(): break;
 		
 		
-		# Robot starts path following as goal
+		# Robot positions in starting position, in its frame (robot_frame)
+		# with CFH, SendGoal doesn't return immediatly, but when the robot reaches starting_position
+		# when SendGoal returns is also when the robot start to follow the path
 		benchmark.SendGoal("start path following")
 		
-		### test ### (with CFH, SendGoal doesn't return immediatly, but when the robot reaches starting_position)
+		### for test: if you want to simulate SendGoal that doesn't return immediately ###
 	#	raw_input("STARTING POSITION\npress ENTER")
 	#	time.sleep(0.01)
 		
+		# start collecting the robot's poses in robot_path, see mocap_callback()
 		start_time = time.time()
 		start_collecting_robot_path()
 		
-		# Robot ends path following
+		# WaitResult returns when the robot finishes the path following
 		benchmark.WaitResult()
 		
+		# stop collecting the robot's poses in robot_path (unsubscribe)
 		end_time = time.time()
 		end_collecting_robot_path()
 		
@@ -238,16 +243,19 @@ def main():
 		rospy.loginfo("Execution time of run %i: %f" % (current_run, execution_time))
 		runs_details[current_run]['execution_time'] = end_time - start_time
 		
-		# Compute accuracy
+		# Compute accuracy (see documentation on how and why)
 		global robot_path, robot_starting_position, robot_reference_position
 		
-		
+		# the starting position for each run is extracted from the first pose in robot_path
 		acquire_starting_position_from_path()
+		# robot_frame is computed from reference_position (on negative x axis) and starting_position (in the origin)
 		update_robot_frame()
 		
-		broadcast_pose2D(translate_robot_pose(robot_starting_position), rospy.Time.now(), "my_robot_starting_position", "/world")
-		broadcast_pose2D(translate_robot_pose(robot_reference_position), rospy.Time.now(), "my_robot_reference_position", "/world")
+		# only needed to visualise with rviz	
+	#	broadcast_pose2D(translate_robot_pose(robot_starting_position), rospy.Time.now(), "my_robot_starting_position", "/world")
+	#	broadcast_pose2D(translate_robot_pose(robot_reference_position), rospy.Time.now(), "my_robot_reference_position", "/world")
 		
+		# instantiate the robot and target paths, for logging reasons
 		robot_path_in_frame = Path()
 		robot_path_in_frame.header.frame_id = 'robot_frame'
 		robot_path_in_frame.poses = [pose2D_to_pose(translate_robot_pose(robot_starting_position))]
@@ -264,7 +272,9 @@ def main():
 		L = 0.0
 		for i in range(1, N): L = L + d(robot_path[i-1], robot_path[i])
 		
+		# compute avarage distance between robot_path and target_path
 		for i in range(1, N):
+			# translation from frame '/world' to frame '/robot_frame'
 			robot_in_frame_pose = translate_robot_pose(robot_path[i])
 			
 			l = l + d(robot_path[i-1], robot_path[i])
@@ -272,17 +282,18 @@ def main():
 			
 			robot_path_in_frame.poses.append(pose2D_to_pose(robot_in_frame_pose))
 			target_path_in_frame.poses.append(pose2D_to_pose(target_path(l/L)))
-		#	print "l/L:%1.4f\t%1.2f"%(l/L, 1000*d(robot_in_frame_pose, target_path(l/L)))
 		
+		# publish robot_path and target_path as nav_msgs/path
 		robot_path_publisher.publish(robot_path_in_frame)
 		target_path_publisher.publish(target_path_in_frame)
 		
-		
+		# (avarage)
 		distance_error = error_sum / N
 		
 		rospy.loginfo("Distance error of run %i: %f" % (current_run, distance_error))
 		runs_details[current_run]['distance_error'] = distance_error
 		
+		# select the best run in terms of accuracy
 		if best_run == None or distance_error < best_distance_error:
 			best_run = current_run
 			best_distance_error = distance_error
