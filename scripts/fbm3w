@@ -199,12 +199,12 @@ def main():
 		# Robot starts path following as goal
 		benchmark.SendGoal("start path following")
 		
+		### test ###
+		raw_input("STARTING POSITION\npress ENTER")
+	#	time.sleep(0.01)
+		
 		start_time = time.time()
 		start_collecting_robot_path()
-		
-		### test ###
-	#	raw_input("press ENTER to let SendGoal return")
-	#	time.sleep(0.01)
 		
 		# Robot ends path following
 		benchmark.WaitResult()
@@ -230,10 +230,13 @@ def main():
 		runs_details[current_run]['execution_time'] = end_time - start_time
 		
 		# Compute accuracy
-		global robot_path
+		global robot_path, robot_starting_position, robot_reference_position
 		
 		acquire_starting_position_from_path()
 		update_robot_frame()
+		
+		broadcast_pose2D(translate_robot_pose(robot_starting_position), rospy.Time.now(), "my_robot_starting_position", "/world")
+		broadcast_pose2D(translate_robot_pose(robot_reference_position), rospy.Time.now(), "my_robot_reference_position", "/world")
 		
 		l = 0.0
 		error_sum = 0.0

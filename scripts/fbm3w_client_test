@@ -40,8 +40,8 @@ while benchmark.Running():
 		continue
 	
 	# Wait for manual confirmation to send result
-	time.sleep(2)
-#	raw_input("press ENTER to confirm result")
+#	time.sleep(2)
+	raw_input("end of PATH FOLLOWING\npress ENTER")
 	benchmark.SendResult()
 
 raw_input("press ENTER to close")
