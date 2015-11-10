@@ -9,7 +9,9 @@ import yaml
 import rospy
 import tf
 from rockin_scoring.BmBox import BmBox
-from geometry_msgs.msg import Pose2D
+from std_msgs.msg import Header
+from geometry_msgs.msg import Pose2D, Pose, PoseStamped
+from nav_msgs.msg import Path
 
 # Benchmark runs
 BENCHMARK_RUNS = 5
@@ -83,7 +85,13 @@ def translate_robot_pose(robot_pose2D):
 def broadcast_pose2D(pose2D, timestamp, child, parent):
 	tf_broadcaster.sendTransform( (pose2D.x, pose2D.y, 0.0), (0,0,0,1), timestamp, child, parent)
 
-
+def pose2D_to_pose(pose2D):
+	ps = PoseStamped()
+	p = Pose()
+	p.position.x = pose2D.x
+	p.position.y = pose2D.y
+	ps.pose = p
+	return ps
 
 
 #############################
@@ -154,12 +162,13 @@ def main():
 	benchmark = BmBox()
 	rospy.loginfo("FBM3W benchmarking node started")
 	
-	
-	# init tf
 	global tf_listener
 	global tf_broadcaster
 	tf_listener = tf.TransformListener()
 	tf_broadcaster = tf.TransformBroadcaster()
+	
+	robot_path_publisher = rospy.Publisher('/fbm3w/robot_path_in_frame', Path, queue_size=10)
+	target_path_publisher = rospy.Publisher('/fbm3w/target_path_in_frame', Path, queue_size=10)
 
 	# Get items
 	runs_specifications = rospy.get_param('runs_specifications')
@@ -199,8 +208,8 @@ def main():
 		# Robot starts path following as goal
 		benchmark.SendGoal("start path following")
 		
-		### test ###
-		raw_input("STARTING POSITION\npress ENTER")
+		### test ### (with CFH, SendGoal doesn't return immediatly, but when the robot reaches starting_position)
+	#	raw_input("STARTING POSITION\npress ENTER")
 	#	time.sleep(0.01)
 		
 		start_time = time.time()
@@ -232,11 +241,20 @@ def main():
 		# Compute accuracy
 		global robot_path, robot_starting_position, robot_reference_position
 		
+		
 		acquire_starting_position_from_path()
 		update_robot_frame()
 		
 		broadcast_pose2D(translate_robot_pose(robot_starting_position), rospy.Time.now(), "my_robot_starting_position", "/world")
 		broadcast_pose2D(translate_robot_pose(robot_reference_position), rospy.Time.now(), "my_robot_reference_position", "/world")
+		
+		robot_path_in_frame = Path()
+		robot_path_in_frame.header.frame_id = 'robot_frame'
+		robot_path_in_frame.poses = [pose2D_to_pose(translate_robot_pose(robot_starting_position))]
+		
+		target_path_in_frame = Path()
+		target_path_in_frame.header.frame_id = 'robot_frame'
+		target_path_in_frame.poses = [pose2D_to_pose(target_path(0.0))]
 		
 		l = 0.0
 		error_sum = 0.0
@@ -252,10 +270,13 @@ def main():
 			l = l + d(robot_path[i-1], robot_path[i])
 			error_sum = error_sum + d(robot_in_frame_pose, target_path(l/L))
 			
-			print "l/L:%1.4f\t%1.2f"%(l/L, 1000*d(robot_in_frame_pose, target_path(l/L)))
-			
-			broadcast_pose2D(robot_in_frame_pose, rospy.Time.now(), "my_robot_in_frame"+str(i), "/world")
-			broadcast_pose2D(target_path(l/L), rospy.Time.now(), "my_target_path"+str(i), "/world")
+			robot_path_in_frame.poses.append(pose2D_to_pose(robot_in_frame_pose))
+			target_path_in_frame.poses.append(pose2D_to_pose(target_path(l/L)))
+		#	print "l/L:%1.4f\t%1.2f"%(l/L, 1000*d(robot_in_frame_pose, target_path(l/L)))
+		
+		robot_path_publisher.publish(robot_path_in_frame)
+		target_path_publisher.publish(target_path_in_frame)
+		
 		
 		distance_error = error_sum / N
 		

@@ -58,6 +58,8 @@
 				/fbm3w/map_metadata
 				/fbm3w/robot_at_work/pose
 				/fbm3w/robot_at_work/pose2d
+				/fbm3w/robot_path_in_frame
+				/fbm3w/target_path_in_frame
 				/fbm3w/info
 				/tf
 				/rosout"
