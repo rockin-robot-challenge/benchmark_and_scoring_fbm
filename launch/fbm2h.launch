@@ -2,7 +2,10 @@
 
 	<group ns="fbm2h">
 		
+		<arg name="team_name" default="" />
+		
 		<rosparam file="$(find rockin_scoring)/config/fbm2h.yaml" command="load" />
+		<rosparam file="$(find rockin_scoring)/transforms/transform-$(arg team_name).yaml" command="load" />
 		
 		<node name="bmbox"
 			pkg="rockin_scoring"
