@@ -34,7 +34,14 @@ def parabola_path(l):
 	return Pose2D(l**2/12, l, 0)
 def semi_ellipse(l):
 	l = float(l)
-	return Pose2D(0.050 - 0.050*cos(pi*l), 0.048*sin(pi*l), 0) # semi ellipse (0,0),(5, 4.8), (10, 0) [cm]
+	return Pose2D(0.11 - 0.11*cos(pi*l), 0.11*sin(pi*l), 0) # semi ellipse (0,0),(5, 4.8), (10, 0) [cm]
+	
+def sine(l):
+	l = float(l)
+	return Pose2D(0.15*l, 0.075*sin(12.5*pi*0.15*l), 0) # semi ellipse (0,0),(5, 4.8), (10, 0) [cm]
+	
+	
+	
 
 spline_path = semi_ellipse
 

@@ -13,7 +13,7 @@
 		<node name="map_server"
 			pkg="map_server"
 			type="map_server"
-			args="$(find rockin_mocap)/config/fbm1_map.yaml"
+			args="$(find rockin_mocap)/config/lisbon_work_testbed_map.yaml"
 		/>
 	
 		<node name="mocap"
@@ -22,7 +22,7 @@
 			respawn="false"
 			launch-prefix=""
 			required="true">
-			<rosparam file="$(find rockin_mocap)/config/fbm1_mocap.yaml" command="load" />
+			<rosparam file="$(find rockin_mocap)/config/fbm1w_mocap.yaml" command="load" />
 		</node>
 
 		<node name="benchmark"

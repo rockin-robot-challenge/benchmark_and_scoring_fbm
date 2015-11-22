@@ -8,6 +8,6 @@ goal:
   starting_pose:
     [0.0, 0.0, 0.0]
   penalty_time:
-    120.0
+    90.0
   timeout_time:
-    120.0
+    90.0

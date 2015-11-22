@@ -1,11 +1,13 @@
-pose:
-  position:
-    x: -0.170958548784
-    y: 0.175409585238
-    z: 1.46230447292
-  orientation:
-    x: 0.0196360237896
-    y: -0.0317247249186
-    z: 0.00894943345338
-    w: 0.999263763428
-
+marker_to_robot_transform:
+- [0.21930404748421034, -0.1417991007623051, -1.4510462369654065]
+- [0.01045314735435746, -0.023453405959011506, -0.03749433740132886, 0.9989668884012849]
+marker_to_robot_transform_2D: [-0.21281283174771612, -0.001930002066433452, 0.0040282268645722525]
+mocap:
+  rigid_bodies:
+    '3': {child_frame_id: robot_markerset, parent_frame_id: world, pose: robot_markerset/pose}
+    '4': {child_frame_id: robot_markerset, parent_frame_id: world, pose: robot_markerset/pose}
+robot_info: homer
+robot_pose: {theta: 0.0, x: 0.0, y: 0.0}
+robot_to_marker_transform:
+- [-0.1622818410396576, 0.15790529549121857, 1.4568688869476318]
+- [-0.01045314735435746, 0.023453405959011506, 0.03749433740132886, 0.9989668884012849]

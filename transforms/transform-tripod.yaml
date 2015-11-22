@@ -1,7 +1,7 @@
 marker_to_robot_transform:
-- [-0.1721573919057846, 0.17597411572933197, 1.4629616737365723]
-- [0.016437271214115756, -0.0506196568638727, 0.0018106263160590907, 0.9985810873866784]
-marker_to_robot_transform_2D: [-0.1721573919057846, 0.17597411572933197, 0.0019620817728552243]
+- [-0.15178581235285557, -0.12052355148402237, -1.2905404980761974]
+- [0.003588926358533161, -0.029305535040695895, -0.004322757758717377, 0.9995547103530307]
+marker_to_robot_transform_2D: [-0.15178581235285557, -0.12052355148402237, -0.008867346765650031]
 mocap:
   rigid_bodies:
     '1': {child_frame_id: robot_marketset, parent_frame_id: world, pose: robot_marketset/pose}
@@ -9,5 +9,5 @@ mocap:
     '3': {child_frame_id: robot_marketset, parent_frame_id: world, pose: robot_marketset/pose}
     '4': {child_frame_id: robot_marketset, parent_frame_id: world, pose: robot_marketset/pose}
     '5': {child_frame_id: robot_marketset, parent_frame_id: world, pose: robot_marketset/pose}
-robot_info: homer
+robot_info: tripod
 robot_pose: {theta: 0.0, x: 0.0, y: 0.0}
