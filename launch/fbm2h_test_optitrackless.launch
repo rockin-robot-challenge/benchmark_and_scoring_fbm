@@ -2,8 +2,12 @@
 
 	<group ns="fbm2h">
 		
-		<rosparam file="$(find rockin_scoring)/config/fbm2h_test_optitrackless.yaml" command="load" />
+		<arg name="team_name" default="" />
 		
+		<rosparam file="$(find rockin_scoring)/config/fbm2h_test.yaml" command="load" />
+		<rosparam file="$(find rockin_scoring)/transforms/transform-$(arg team_name).yaml" command="load" />
+		
+		<!-- this commands must be executed 'manually', see documentation "The RoCKIn Benchmarking System" -->
 		<!--rosparam param="use_sim_time" > true </rosparam-->
 		<!--node name="replay_fbm2h_mocap"
 			pkg="rosbag"

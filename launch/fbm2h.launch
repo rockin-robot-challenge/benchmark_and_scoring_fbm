@@ -32,7 +32,7 @@
 			respawn="false"
 			launch-prefix=""
 			required="true">
-			<rosparam file="$(find rockin_mocap)/config/fbm2h_mocap.yaml" command="load" />
+			<rosparam file="$(find rockin_mocap)/config/all_home_mocap.yaml" command="load" />
 		</node>
 		
 		<node pkg="rosbag"

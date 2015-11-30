@@ -22,7 +22,7 @@
 			respawn="false"
 			launch-prefix=""
 			required="true">
-			<rosparam file="$(find rockin_mocap)/config/fbm1w_mocap.yaml" command="load" />
+			<rosparam file="$(find rockin_mocap)/config/all_work_mocap.yaml" command="load" />
 		</node>
 
 		<node name="benchmark"
