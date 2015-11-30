@@ -149,7 +149,7 @@ def main():
 				
 				robot_pose_acquired = True
 
-			except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException), Argument:
+			except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, tf.Exception), Argument: # TODO IMPORTANT: tf.Exception when there is no optitrack. To test with optitrack
 				robot_pose_acquired = False
 				rospy.loginfo("Robot pose not acquired")
 				rospy.loginfo(Argument)

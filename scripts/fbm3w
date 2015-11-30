@@ -59,9 +59,10 @@ def acquire_robot_position():
 			
 			return Pose2D(x, y, theta)
 			
-		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, tf.Exception), Argument:
 			rospy.loginfo("Position couldn't be acquired, retrying...")
-			tf_listener.waitForTransform("/world", "/robot_at_work", rospy.Time(), rospy.Duration(2.0))
+			rospy.loginfo(Argument)
+		#	tf_listener.waitForTransform("/world", "/robot_at_work", rospy.Time(), rospy.Duration(2.0))
 
 ### given a robot Pose2D relative to world, returns a Pose2D relative to robot_frame
 def translate_robot_pose(robot_pose2D):
@@ -81,7 +82,7 @@ def translate_robot_pose(robot_pose2D):
 			
 			return Pose2D(x, y, 0)
 		
-		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, tf.Exception), Argument:
 			rospy.loginfo("Transform couldn't be computed, retrying...")
 			# return None
 
