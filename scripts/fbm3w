@@ -27,11 +27,8 @@ robot_path = []
 # target paths
 def line_path(l):
 	l = float(l)
-	return Pose2D(0.30*l, 0.10*l, 0) # line from (0, 0) to (30, 10) [cm]
+	return Pose2D(0.15*l, 0.045*l, 0) # line from (0, 0) to (30, 10) [cm]
 
-def parabola_path(l):
-	l = float(l)
-	return Pose2D(l**2/12, l, 0)
 def semi_ellipse(l):
 	l = float(l)
 	return Pose2D(0.11 - 0.11*cos(pi*l), 0.11*sin(pi*l), 0) # semi ellipse (0,0),(5, 4.8), (10, 0) [cm]
@@ -41,9 +38,8 @@ def sine(l):
 	return Pose2D(0.15*l, 0.075*sin(12.5*pi*0.15*l), 0) # semi ellipse (0,0),(5, 4.8), (10, 0) [cm]
 	
 	
-	
 
-spline_path = semi_ellipse
+spline_path = sine
 
 tf_listener = None
 tf_broadcaster = None
@@ -236,8 +232,8 @@ def main():
 		
 		if benchmark.Timeout():
 			print "TIMEOUT"
-			execution_time = execution_time + (end_time - start_time)
-			continue
+		#	execution_time = execution_time + (end_time - start_time)
+		#	continue
 
 		if not benchmark.Running():
 			print "NOT RUNNING"
