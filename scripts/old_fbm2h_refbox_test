@@ -6,8 +6,8 @@ import yaml
 import rospy
 from rockin_scoring.RefBox import RefBox
 
-benchmark = RefBox("refbox_test")
-rospy.loginfo("FBM1H refbox test node started")
+benchmark = RefBox()
+rospy.loginfo("FBM2H refbox test node started")
 
 # Wait for client
 benchmark.WaitClient()
@@ -20,9 +20,7 @@ while (benchmark.Running()):
 		time.sleep(1)
 		# Notify manual operation execution
 		benchmark.ConfirmManualOperation()
-	
-	
-	
+		
 	time.sleep(1)
 	
 # Wait for score from the bmbox
@@ -31,12 +29,10 @@ score = yaml.load(score_yaml)
 
 # display the score somewhere
 print "<- RECEIVED SCORE"
-#if score:
-#	for field in score:
-#		print "%s: %s" % (field, score[field])
-
-print score_yaml
+if score:
+	for field in score:
+		print "%s: %s" % (field, score[field])
 
 benchmark.End()
 
-raw_input("press ENTER to close")
+time.sleep(10)

@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+
+import random
+import time
+import yaml
+
+import rospy
+from rockin_scoring.Client import Client
+
+benchmark = Client("client_test")
+rospy.loginfo("FBM3W client test node started")
+
+# Connect to the refbox (check time sync, etc)
+benchmark.Connect()
+
+auto_sendResult = False
+
+goals_timing_multiple_runs = \
+	[1446819283.998105, 1446819302.657172, \
+	 1446819318.984143, 1446819345.768882, \
+	 1446819361.465380, 1446819377.034405, \
+	 1446819387.743904, 1446819395.944860, \
+	 1446819425.133162, 1446819436.406868]
+
+goals_timing_single_run_spline = [1446819156.994122, 1446819175.001821]
+
+goals_timing = goals_timing_multiple_runs
+i = 0
+
+while benchmark.Running():
+	# Get the goal (encoded as YAML string)
+	goal_yaml = benchmark.RequestGoal()
+	print "<- RECEIVED GOAL", goal_yaml
+	
+	# auto send result
+	if auto_sendResult and i < len(goals_timing):
+		rospy.sleep(rospy.Time(goals_timing[i]) - rospy.Time.now())
+		i = i + 1
+		benchmark.SendResult()
+		continue
+	
+	# Wait for manual confirmation to send result
+#	time.sleep(2)
+	raw_input("end of PATH FOLLOWING\npress ENTER")
+	benchmark.SendResult()
+
+raw_input("press ENTER to close")

@@ -1,0 +1,40 @@
+<launch>
+
+	<group ns="fbm2h">
+		
+		<arg name="team_name" default="" />
+		
+		<rosparam file="$(find rockin_scoring)/config/fbm2h_test.yaml" command="load" />
+		<rosparam file="$(find rockin_scoring)/transforms/transform-$(arg team_name).yaml" command="load" />
+		
+		<!-- this commands must be executed 'manually', see documentation "The RoCKIn Benchmarking System" -->
+		<!--rosparam param="use_sim_time" > true </rosparam-->
+		<!--node name="replay_fbm2h_mocap"
+			pkg="rosbag"
+			type="play"
+			output="screen"
+			args="$(find rockin_mocap)/test_logs/log_fbm2h_mocap_2015-10-23-16-15-40_0.bag -\-clock" /-->
+		
+		<node name="bmbox"
+			pkg="rockin_scoring"
+			type="fbm2h"
+			output="screen"
+			launch-prefix="gnome-terminal -e"
+		/>
+		
+		<node name="refbox"
+			pkg="rockin_scoring"
+			type="fbm2h_refbox_test"
+			output="screen"
+			launch-prefix="gnome-terminal -e"
+		/>
+		
+		<node name="client"
+			pkg="rockin_scoring"
+			type="fbm2h_client_test"
+			output="screen"
+			launch-prefix="gnome-terminal -e"
+		/>
+		
+	</group>    
+</launch>

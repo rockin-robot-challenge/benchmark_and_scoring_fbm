@@ -10,7 +10,7 @@
 			respawn="false"
 			launch-prefix=""
 			required="true">
-			<rosparam file="$(find rockin_mocap)/config/fbm1_mocap.yaml" command="load" />
+			<rosparam file="$(find rockin_mocap)/config/all_home_mocap.yaml" command="load" />
 		</node>
 
 		<node name="acquire_items" pkg="rockin_scoring" type="acquire_items" output="screen" launch-prefix="gnome-terminal -e">

@@ -1,128 +1,256 @@
 #!/usr/bin/env python
-import Levenshtein
+import math
 import random
 import time
 import yaml
+from datetime import datetime
 
 # ROS imports
 import rospy
+import tf
+from geometry_msgs.msg import Pose2D
 from rockin_scoring.BmBox import BmBox
 
-# Benchmark runs
-BENCHMARK_RUNS = 1
-
-# Switches
-EASY_SWITCHES_LIST = [1, 2, 4, 5, 6]
-HARD_SWITCHES_LIST = [3, 7, 8, 9, 10]
-NON_CONFIGURABLE_SWITCHES_LIST = [2, 10]
-
-# Switches to actuate for each run
-EASY_SWITCHES_TO_OPERATE = 5
-HARD_SWITCHES_TO_OPERATE = 5
 
 def main():
-
+	
 	# Init benchmarking node
 	benchmark = BmBox()
 	rospy.loginfo("FBM2H benchmarking node started")
 	
+	# init tf and subscribers
+	tf_listener = tf.TransformListener()
+	tf_broadcaster = tf.TransformBroadcaster()
+	
+	# Get the parameters of the benchmark (waypoints, penalty_time, timeout_time)
+	starting_robot_pose = Pose2D(*rospy.get_param('goal/starting_pose'))
+	waypoints = rospy.get_param('goal/waypoints')
+#	penalty_time = rospy.get_param('goal/penalty_time')
+#	timeout_time = rospy.get_param('goal/timeout_time')
+	
+	rospy.set_param('goal/num_waypoints', len(waypoints))
+	
+	# The goal payload sent to the client containing the list of all waypoints, etc
+	goal_payload_yaml = yaml.dump(rospy.get_param('goal'))
+	
+	rospy.loginfo( "Goal from config: %s" % goal_payload_yaml )
+	
 	# Variables to compute score
-	runs = 0
-	score_sum = 0
-	damaged_switches_sum = 0
-	execution_time = 0.0
+	N = len(waypoints)
+	i = 0
+	sum_d = 0.0 # [m]
+	sum_sin = 0.0
+	sum_cos = 0.0
+	execution_time = 0.0 # [s]
+#	penalties = 0
+	timeouts = 0
+	segments_detail = {}
+	
+	#raw_input("press ENTER to START")
+	
+#	raw_input("press ENTER if the robot is posed on the start pose")
+	
+	# Acquire the marker-robot transform
+#	robot_pose_acquired = False
+#	while not robot_pose_acquired:
+#		try:
+#			time.sleep(1.0)
+#			
+#			now = rospy.Time.now()
+#			
+#			# Starting robot pose from Pose2D
+#			starting_robot_position = (starting_robot_pose.x, starting_robot_pose.y, 0.0)
+#			starting_robot_rotation = tf.transformations.quaternion_from_euler(0, 0, starting_robot_pose.theta)
+#		
+#			# broadcast the robot frame relative to the marker
+#			tf_broadcaster.sendTransform(starting_robot_position, starting_robot_rotation, now, "/actual_robot", "/world")
+#		
+#			# receive the robot transform and compute the robot pose
+#			time.sleep(0.1)
+#			marker_to_robot_transform = tf_listener.lookupTransform("/robot_at_home", "/actual_robot", rospy.Time(0))
+#		
+#			print  "marker-robot transform acquired: ", marker_to_robot_transform
+#			
+#			robot_pose_acquired = True
+#			
+#		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException), Argument:
+#			robot_pose_acquired = False
+#			rospy.loginfo("marker-robot transform not acquired")
+#			rospy.loginfo(Argument)
+	
+	# acquire marker-robot transform from config
+	marker_to_robot_transform = rospy.get_param('marker_to_robot_transform')
 
+	print  "marker-robot transform acquired: ", marker_to_robot_transform
+	
+	
+#	[[x_m, y_m, z_m],[qx_m, qy_m, qz_m, qs_m]] = marker_to_robot_transform
+	
+	
+#	print x_m, y_m, z_m, qx_m, qy_m, qz_m, qs_m
+	
+	
 	# Wait for client
 	benchmark.WaitClient()
-
-	# Start the benchmark
-	while benchmark.Running() and (runs < BENCHMARK_RUNS):
-		runs = runs + 1
 	
-		initial_state = []
-		switches = []
-		
-		for i in EASY_SWITCHES_LIST:
-			if i in NON_CONFIGURABLE_SWITCHES_LIST:
-				initial_state.append(0)
-			else:
-				initial_state.append(random.randint(0, 1))
-		
-		for i in HARD_SWITCHES_LIST:
-			if i in NON_CONFIGURABLE_SWITCHES_LIST:
-				initial_state.append(0)
-			else:
-				initial_state.append(random.randint(0, 1))
+	# Start the benchmark
+	while benchmark.Running() and not benchmark.Timeout() and i < N:
 
-		rospy.loginfo("Switches initial state: %s" % initial_state)
+		# Send goal
+		if i == 0: # first run (robot in starting position, next waypoint is p0)
+			benchmark.SendGoal(goal_payload_yaml)
+		else:
+			benchmark.SendGoal()
 		
-		easy_switches = random.sample(EASY_SWITCHES_LIST, EASY_SWITCHES_TO_OPERATE)
-		hard_switches = random.sample(HARD_SWITCHES_LIST, HARD_SWITCHES_TO_OPERATE)
-		switches = easy_switches + hard_switches
+		# initialize the detail for the current segment
+		segments_detail[i] = {}
 		
-		rospy.loginfo("Switches to operate: %s" % switches)
+		start_segment_time = time.time()
+		segments_detail[i]['start_segment_time'] = start_segment_time
 		
-		# Request manual operation to the refbox
-		benchmark.ManualOperation("Prepare switches with this configuration: %s " % initial_state)
-
-		if not benchmark.Running():
-			break
-		
-		# Fill goal
-		goal = {
-			'initial_state': initial_state,
-			'switches': switches
-		},
-
-		# Send goal to client
-		goal_yaml = yaml.dump(goal)
-		benchmark.SendGoal(goal_yaml)
-		start_time = time.time()
-
 		# Wait for result from client
-		result_yaml = benchmark.WaitResult()
-		end_time = time.time()
+		result_yaml	= benchmark.WaitResult()
+	#	result = yaml.load(result_yaml)
+		segments_detail[i]['result_payload'] = result_yaml
 		
-		if benchmark.Timeout():
-			execution_time = execution_time + (end_time - start_time)
+	#	if result != i:
+	#		rospy.loginfo( "WRONG WAYPOINT: %s received instead of %s" % (result, i) )
+	#		# continue #TODO: what to do in such case?
+		
+		# Compute segment time
+		end_segment_time	= time.time()
+		segment_time		= end_segment_time - start_segment_time
+		segments_detail[i]['end_segment_time'] = end_segment_time
+		segments_detail[i]['segment_time'] = segment_time
+		
+		# Collect the target and robot poses (using tf)
+		robot_pose_acquired = False
+		while not robot_pose_acquired:
+			try:
+				now = rospy.Time.now()
+		
+				# world_to_marker transform
+				tf_listener.waitForTransform("/world", "/robot_at_home", now, rospy.Duration(1.0))
+				marker_transform = tf_listener.lookupTransform("/world", "/robot_at_home", now)
+		
+				# broadcast the robot frame relative to the marker
+				tf_broadcaster.sendTransform(marker_to_robot_transform[0], marker_to_robot_transform[1], now, "/actual_robot", "/robot_at_home")
+				
+				# receive the robot transform and compute the robot pose
+				tf_listener.waitForTransform("/world", "/actual_robot", now, rospy.Duration(1.0))
+				( (robot_x, robot_y, _), robot_rotation ) = tf_listener.lookupTransform("/world", "/actual_robot", rospy.Time(0))
+				(_, _, robot_theta) = tf.transformations.euler_from_quaternion(robot_rotation)
+				
+				robot_pose = Pose2D(robot_x, robot_y, robot_theta)
+				target_pose = Pose2D(*waypoints[i])
+		
+				segments_detail[i]['target_pose'] = yaml.dump(target_pose)
+				segments_detail[i]['robot_pose']  = yaml.dump(robot_pose)
+				
+				robot_pose_acquired = True
+
+			except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, tf.Exception), Argument: # TODO IMPORTANT: tf.Exception when there is no optitrack. To test with optitrack
+				robot_pose_acquired = False
+				rospy.loginfo("Robot pose not acquired")
+				rospy.loginfo(Argument)
+		
+		# overall timeout (refBoxState.END and refbox_payload = "reason: timeout")
+		if benchmark.Timeout() and not benchmark.Running():
+			rospy.loginfo( "TIMEOUT AND NOT RUNNING" )
+			segments_detail[i]['refbox_timeout'] = True
+			execution_time = execution_time + segment_time
 			continue
-
-		if not benchmark.Running():
-			break
-
-		result = yaml.load(result_yaml)
-
-		rospy.loginfo("Received result - Operated switches: %s, damaged switches: %d"
-		% (result['switches'], result['damaged_switches']))
+		else:
+			segments_detail[i]['refbox_timeout'] = False
 		
-		# Evaluate score
-		score = Levenshtein.distance("".join("{0}".format(n) for n in switches), "".join("{0}".format(n) for n in result['switches']))
-		rospy.loginfo("Partial score: %f", score)
-		score_sum = score_sum + score		
-
-		# Damaged switches
-		damaged_switches_sum = damaged_switches_sum + result['damaged_switches']
-
-		# Evaluate execution time
-		execution_time = execution_time + (end_time - start_time)
-
+		
+		# segment timeout (refbox_payload = "reason: timeout")
+		if benchmark.Timeout():
+			rospy.loginfo( "TIMEOUT ON THIS SEGMENT" )
+			timeouts = timeouts + 1
+			segments_detail[i]['timeout'] = True
+		else:
+			segments_detail[i]['timeout'] = False
+		
+	#	if not benchmark.Running():
+	#		rospy.loginfo( "NOT RUNNING" )
+	#		segments_detail[i]['refbox_not_running'] = True
+	#		continue
+	#	segments_detail[i]['refbox_not_running'] = False
+		
+		# Enforcing of rule: The maximum time allowed to the robot to go from each waypoint to the next waypoint, without penalization.
+	#	if segment_time > penalty_time:
+	#		rospy.loginfo( "PENALTY APPLIED ON THIS SEGMENT" )
+	#		penalties = penalties + 1
+	#		segments_detail[i]['penalty'] = True
+	#	else:
+	#		segments_detail[i]['penalty'] = False
+		
+	#	print segment_time, timeout_time
+		
+		# Enforcing of rule: If robots spent more time than this deadline when going from one waypoint to the next waypoint, they will not get points on that path. (assuming penalization from precedent rule is implied when this rule is enforced) 
+	#	if segment_time > timeout_time:
+	#		rospy.loginfo( "TIMEOUT ON THIS SEGMENT" )
+	#		execution_time = execution_time + segment_time
+	#		timeouts = timeouts + 1
+	#		segments_detail[i]['timeout'] = True
+	#		i = i + 1
+	#		continue
+	#	segments_detail[i]['timeout'] = False
+		
+		# Evaluate position and orientation error between target pose (tp) and robot pose (rp)
+		rp = robot_pose	# robot position
+		tp = target_pose # target position
+		
+		d_error = math.sqrt( (rp.x-tp.x)**2 + (rp.y-tp.y)**2 )
+		sum_d = sum_d + d_error
+		
+		sin_error = math.sin(math.fabs(rp.theta - tp.theta))
+		sum_sin = sum_sin + sin_error
+		cos_error = math.cos(math.fabs(rp.theta - tp.theta))
+		sum_cos = sum_cos + cos_error
+		
+		segments_detail[i]['dinstance_error'] = d_error
+		segments_detail[i]['orientation_error'] = math.atan2(sin_error, cos_error)
+		
+		# Update execution time
+		execution_time = execution_time + segment_time
+		
+		rospy.loginfo("\n\n - segment_time: %s\n - dinstance_error: %s\n - orientation_error: %s" % (segment_time, segments_detail[i]['dinstance_error'], segments_detail[i]['orientation_error']))
+		
+		i = i + 1
+		
+	
 	# Evaluate final score
-	final_score = {
-		'runs': runs,
-		'score': score_sum,
-		'damaged_switches': damaged_switches_sum,
-		'execution_time': execution_time
+	position_accuracy = sum_d / N
+	orientation_accuracy = math.atan2(sum_sin, sum_cos)
+	
+	hits = raw_input("Insert number of hits ")
+	details = {'marker-robot transform': marker_to_robot_transform}
+	
+	score = {
+		'position_accuracy': position_accuracy,
+		'orientation_accuracy': orientation_accuracy,
+#		'penalized_segments': penalties,
+		'timeout_segments': timeouts,
+		'execution_time': execution_time,
+		'hits': hits,
+		'segments_details': segments_detail,
+		'details': details
 	}
 	
-	final_score_yaml = yaml.dump(final_score)
-	benchmark.SendScore(final_score_yaml)
+	score_yaml = yaml.dump(score, default_flow_style=False)
+	print score_yaml
+	
+	benchmark.SendScore(score_yaml)
 	
 	# Benchmark concluded
 	benchmark.End()
-
-	print score
-	time.sleep(10)
+	
+	#TODO:  save score locally
+	
+	raw_input("press ENTER to close")
 				
 if __name__ == '__main__':
 	main()
-
+	

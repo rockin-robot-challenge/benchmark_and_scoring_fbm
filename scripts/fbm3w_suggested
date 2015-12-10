@@ -1,0 +1,92 @@
+#!/usr/bin/env python
+import math
+import random
+import time
+import yaml
+
+# ROS imports
+import rospy
+import tf
+from rockin_scoring.BmBox import BmBox
+
+# Benchmark runs
+BENCHMARK_RUNS = 5
+
+def main():
+
+	# Init benchmarking node
+	benchmark = BmBox()
+	rospy.loginfo("FBM3W benchmarking node started")
+	
+	# Variables to compute score
+	runs = 0
+	execution_time = 0.0
+
+	# Wait for client
+	benchmark.WaitClient()
+
+	# Start the benchmark
+	while benchmark.Running():
+		runs = runs + 1
+		
+		rospy.loginfo("Wait for manual operation")
+		benchmark.ManualOperation("")
+		
+		print "manual operation completed"
+
+        #
+        # TODO: Acquire first/calibration pose via the optitrack system
+        #
+		rospy.loginfo("Calibration pose acquired")
+		
+		if not benchmark.Running(): break
+				
+		# Send goal
+		benchmark.SendGoal()
+		start_time = time.time()
+
+        #
+        # TODO: Start tracking the robot via the optitrack system
+        #
+		rospy.loginfo("Start tracking the robot")
+		
+		# Wait for result from client
+		benchmark.WaitResult()
+		end_time = time.time()
+
+        #
+        # TODO: Stop tracking the robot
+        #
+		rospy.loginfo("Stop tracking the robot")
+		
+		if benchmark.Timeout():
+			print "TIMEOUT"
+			execution_time = execution_time + (end_time - start_time)
+			continue
+
+		if not benchmark.Running():
+			print "NOT RUNNING"
+			continue
+        
+        #
+		# TODO: Evaluate run
+        #
+		rospy.loginfo("The evaluation of this run is XYZ")
+
+    #
+	# TODO: Evaluate final score
+	score = {
+		'result': 0
+	}
+	
+	score_yaml = yaml.dump(score)
+	benchmark.SendScore(score_yaml)
+	
+	# Benchmark concluded
+	benchmark.End()
+
+	#time.sleep(10)
+				
+if __name__ == '__main__':
+	main()
+	
