@@ -1,0 +1,266 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import math
+import time
+import yaml
+#import random
+
+# ROS imports
+import rospy
+import tf
+from std_msgs.msg import Header, String
+from geometry_msgs.msg import Pose2D, Pose, PoseArray, PoseStamped
+from nav_msgs.msg import Path
+
+WP_TO_WP_MIN_DISTANCE = 0.100
+WP_TO_STARTPOINT_MIN_DISTANCE = 0.050
+STOP_DISTANCE_THRESHOLD = 0.050
+
+
+def pose2D_to_pose(pose2D):
+	p = Pose()
+	p.position.x = pose2D.x
+	p.position.y = pose2D.y
+	
+	quaternion = tf.transformations.quaternion_from_euler(0.0, 0.0, pose2D.theta)
+	p.orientation.x = quaternion[0]
+	p.orientation.y = quaternion[1]
+	p.orientation.z = quaternion[2]
+	p.orientation.w = quaternion[3]
+	
+	return p
+
+def pose2D_to_pose_stamped(pose2D):
+	ps = PoseStamped()
+	ps.pose = pose2D_to_pose(pose2D)
+	return ps
+
+def distance_2D(p1, p2):
+	if not p1 or not p2:
+		return None
+	
+	return math.sqrt( (p1.x-p2.x)**2 + (p1.y-p2.y)**2 )
+
+def main():
+	rospy.init_node("benchmark")
+	
+	rospy.loginfo("benchmarking node started")
+	
+	# init tf, publishers and subscribers
+	tf_listener = tf.TransformListener()
+	tf_broadcaster = tf.TransformBroadcaster()
+	robot_path_msgs_publisher = rospy.Publisher('/bntw_robocup/visualisation/robot_path', Path, queue_size=10)
+	robot_pose_msgs_publisher = rospy.Publisher('/bntw_robocup/visualisation/robot_pose', PoseStamped, queue_size=10)
+	robot_waypoints_msgs_publisher = rospy.Publisher('/bntw_robocup/visualisation/robot_waypoints', PoseArray, queue_size=10)
+	target_waypoints_msgs_publisher = rospy.Publisher('/bntw_robocup/visualisation/target_waypoints', PoseArray, queue_size=10)
+	score_msgs_publisher = rospy.Publisher('/bntw_robocup/visualisation/current_score', String, queue_size=10)
+	
+	# Get the parameters of the benchmark (waypoints, etc)
+	waypoints = rospy.get_param('goal/waypoints')
+	reached_waypoint_stop_time = rospy.get_param('goal/reached_waypoint_stop_time')
+	
+	marker_to_robot_transform = rospy.get_param('marker_to_robot_transform')
+	rospy.loginfo(  "marker-robot transform acquired: " + str( marker_to_robot_transform ) )
+	rospy.set_param('goal/num_waypoints', len(waypoints))
+	
+	# State variables
+	benchmark_running = True
+	first_robot_pose = None
+	last_stopped_robot_pose = None
+	last_stop_time = None
+	robot_is_stopped = False
+	waypoint_reached = False
+	acquired_waypoints = []
+	acquired_path = []
+	i = 0
+	N = len(waypoints)
+	
+	# Score variables
+	sum_d = 0.0 # [m]
+	sum_sin = 0.0
+	sum_cos = 0.0
+	execution_time = 0.0
+	
+	# Visualisation variables
+	robot_path_msgs = Path()
+	robot_path_msgs.header.frame_id = 'world'
+	robot_path_msgs.poses = []
+	
+	robot_waypoints_msgs = PoseArray()
+	robot_waypoints_msgs.header.frame_id = 'world'
+	robot_waypoints_msgs.poses = []
+	
+	target_waypoints_msgs = PoseArray()
+	target_waypoints_msgs.header.frame_id = 'world'
+	target_waypoints_msgs.poses = []
+	
+	score_msgs = String()
+	score_msgs.data = "\n\n\n\n\nPartial Score:\n\n"
+	
+	for wp in waypoints: target_waypoints_msgs.poses.append(pose2D_to_pose(Pose2D(*wp)))
+	
+	
+	# Start the benchmark
+	start_time = time.time()
+	
+	# Start tracking the robot via the optitrack system
+	rospy.loginfo("Start tracking the robot")
+	
+	time.sleep(1)
+	
+	rospy.loginfo("slept")
+	
+	last_stop_time = time.time()
+	
+	rate = rospy.Rate(10) # 10hz
+	
+	#	Main loop:
+	#	 acquire the robot's position every so often and check if it has stopped for at least 3 seconds,
+	#	 in such case collect that pose in a list to compare to the waypoints list
+	while benchmark_running and not rospy.is_shutdown() and i < N:
+	
+		# Collect the target and robot poses (using tf)
+		robot_pose_acquired = False
+		while not robot_pose_acquired and not rospy.is_shutdown():
+			try:
+				now = rospy.Time.now()
+				
+				# world_to_marker transform
+				tf_listener.waitForTransform("/world", "/robot_at_work", now, rospy.Duration(1.0))
+				marker_transform = tf_listener.lookupTransform("/world", "/robot_at_work", now)
+				
+				# broadcast the robot frame relative to the marker
+				tf_broadcaster.sendTransform(marker_to_robot_transform[0], marker_to_robot_transform[1], now, "/actual_robot", "/robot_at_work")
+			
+				# receive the robot transform and compute the robot pose
+				tf_listener.waitForTransform("/world", "/actual_robot", now, rospy.Duration(1.0))
+				( (robot_x, robot_y, _), robot_rotation ) = tf_listener.lookupTransform("/world", "/actual_robot", rospy.Time(0))
+				(_, _, robot_theta) = tf.transformations.euler_from_quaternion(robot_rotation)
+				
+				robot_pose = Pose2D(robot_x, robot_y, robot_theta)
+				target_pose = Pose2D(*waypoints[i])
+				
+				if not first_robot_pose:
+					first_robot_pose = robot_pose
+				
+				if not last_stopped_robot_pose:
+					print "init last_stopped_robot_pose"
+					last_stopped_robot_pose = robot_pose
+				
+				# Publish the robot path and the waypoints
+				robot_path_msgs.poses.append(pose2D_to_pose_stamped(robot_pose))
+				robot_pose_msg = pose2D_to_pose_stamped(robot_pose)
+				robot_pose_msg.header.frame_id = 'world'
+				
+				robot_pose_msgs_publisher.publish(robot_pose_msg)
+				robot_path_msgs_publisher.publish(robot_path_msgs)
+				robot_waypoints_msgs_publisher.publish(robot_waypoints_msgs)
+				target_waypoints_msgs_publisher.publish(target_waypoints_msgs)
+				
+				# if the robot is moving update the last_stop_time to now
+				if distance_2D(robot_pose, last_stopped_robot_pose) > STOP_DISTANCE_THRESHOLD:
+					last_stop_time = time.time()
+					last_stopped_robot_pose = robot_pose
+					robot_is_stopped = False
+					waypoint_reached = False
+				else:
+					robot_is_stopped = True
+				
+				if not waypoint_reached and (time.time() - last_stop_time) >= reached_waypoint_stop_time:
+					waypoint_reached = True
+					# if this is the first acquired waypoint or this waypoint is valid (farther enough from the last waypoint and from the first acquired pose), then insert new waypoint
+					if ( not acquired_waypoints or distance_2D(robot_pose, acquired_waypoints[-1]) > WP_TO_WP_MIN_DISTANCE ) and distance_2D(robot_pose, first_robot_pose) > WP_TO_STARTPOINT_MIN_DISTANCE:
+					#if not acquired_waypoints or distance_2D(robot_pose, acquired_waypoints[-1]) > 0.100:
+						#
+						# new waypoint acquired
+						#
+						
+						acquired_waypoints += [robot_pose]
+						
+						robot_waypoints_msgs.poses.append(pose2D_to_pose(robot_pose))
+						
+						rp = robot_pose	# robot position
+						tp = target_pose # target position
+		
+						d_error = math.sqrt( (rp.x-tp.x)**2 + (rp.y-tp.y)**2 )
+						sum_d = sum_d + d_error
+		
+						sin_error = math.sin(math.fabs(rp.theta - tp.theta))
+						sum_sin = sum_sin + sin_error
+						cos_error = math.cos(math.fabs(rp.theta - tp.theta))
+						sum_cos = sum_cos + cos_error
+						
+						waypoint_position_accuracy = d_error
+						waypoint_orientation_accuracy = math.atan2(sin_error, cos_error)
+						
+						score_msgs.data += "- Waypoint %i\n  Position Accuracy:\t%1.1f cm\n  Orientation Accuracy:\t%1.0f°\n\n\n"%(i+1, waypoint_position_accuracy*100, math.fabs(waypoint_orientation_accuracy)*180/math.pi)
+						score_msgs_publisher.publish(score_msgs)
+						
+						
+						i += 1
+					
+				
+				print "waypoints:\n", acquired_waypoints
+				
+				d = distance_2D(robot_pose, last_stopped_robot_pose)
+				
+				print "s: " + str(robot_is_stopped)
+				print "d: %3.3f\t"%d + "-"*int(100*d/STOP_DISTANCE_THRESHOLD)
+				print "t: %3.1f"%(time.time() - last_stop_time)
+				
+				robot_pose_acquired = True
+			
+			#except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, tf.Exception), Argument:
+			except tf.Exception, Argument:
+				robot_pose_acquired = False
+				rospy.loginfo("Robot pose not acquired")
+				rospy.loginfo(Argument)
+			
+			rate.sleep()
+			
+			# end main loop
+			
+	if rospy.is_shutdown():
+		print "TIMEOUT EMULATED"
+	
+	
+	# Wait for result from client
+	end_time = time.time()
+	execution_time = end_time - start_time
+	
+	# Evaluate final score
+	position_accuracy = sum_d / N
+	orientation_accuracy = math.atan2(sum_sin, sum_cos)
+	
+	score = {
+		'number_waypoints_reached': len(acquired_waypoints),
+		'position_accuracy': position_accuracy,
+		'orientation_accuracy': orientation_accuracy,
+		'execution_time': execution_time
+	}
+	
+	score_msgs.data += "\n\n\nFinal Score\n\n  Waypoints Reached:\t%i / %i\n\n  Position Accuracy:\t%1.1f cm\n\n  Orientation Accuracy:\t%1.0f°"%(i, N, position_accuracy*100, math.fabs(orientation_accuracy)*180/math.pi)
+	score_msgs_publisher.publish(score_msgs)
+	
+	score_yaml = yaml.dump(score)
+#	benchmark.SendScore(score_yaml)
+	
+	print score_yaml
+	
+	raw_input("press enter to close")
+	
+	# Benchmark concluded
+#	benchmark.End()
+	
+	#time.sleep(10)
+	
+if __name__ == '__main__':
+	try:
+		main()
+	except rospy.ROSInterruptException:
+	#	time.sleep(10)
+		pass
+
+#if __name__ == '__main__':
+#	main()
