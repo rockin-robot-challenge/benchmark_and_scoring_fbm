@@ -1,0 +1,9 @@
+BNT@Work
+
+set $ROS_IP and $ROS_MASTER_URI when needed
+
+reset markerset orientation before using it
+
+update configuration
+
+

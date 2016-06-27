@@ -15,6 +15,20 @@
 			output="screen"
 		/>
 		
+		<node name="fake_refbox"
+			pkg="rockin_scoring"
+			type="bntw_robocup_fake_refbox"
+			output="screen"
+			launch-prefix="gnome-terminal -e"
+		/>
+		
+		<node name="score_visualiser"
+			pkg="rockin_scoring"
+			type="bntw_robocup_score_visualiser"
+			output="screen"
+			launch-prefix="gnome-terminal -e"
+		/>
+		
 		<node name="world_map"
 			pkg="tf"
 			type="static_transform_publisher"
@@ -33,24 +47,28 @@
 			respawn="false"
 			launch-prefix=""
 			required="true">
-			<rosparam file="$(find rockin_mocap)/config/all_work_mocap.yaml" command="load" />
+			<rosparam file="$(find rockin_mocap)/config/robocup_mocap.yaml" command="load" />
 		</node>
-		<!--
+		
 		<node pkg="rosbag"
 			type="record"
 			name="log_bntw_robocup"
 			args="record -o /home/rockin/logs/log_bntw_robocup
-				-
-				-split -
-				-duration=1h
+				--split --duration=1h
+				/bntw_robocup/info
 				/bntw_robocup/map
 				/bntw_robocup/map_metadata
 				/bntw_robocup/robot/pose
 				/bntw_robocup/robot/pose2d
-				/bntw_robocup/info
+				/bntw_robocup/robot_markerset/pose
+				/bntw_robocup/timeout_signal
+				/bntw_robocup/visualisation/current_score
+				/bntw_robocup/visualisation/robot_path
+				/bntw_robocup/visualisation/robot_pose
+				/bntw_robocup/visualisation/robot_waypoints
+				/bntw_robocup/visualisation/target_waypoints
 				/tf
 				/rosout"
 		/>
-		-->
 	</group>    
 </launch>

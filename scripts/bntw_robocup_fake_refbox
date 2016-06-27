@@ -1,0 +1,37 @@
+#!/usr/bin/env python
+
+import time
+import yaml
+
+# ROS imports
+import rospy
+from std_msgs.msg import Bool
+
+
+def main():
+	rospy.init_node("fake_refbox")
+	rospy.loginfo("Fake refbox node started")
+
+	timeout_msgs_publisher = rospy.Publisher('/bntw_robocup/timeout_signal', Bool, queue_size=10)
+
+	while not rospy.is_shutdown():
+		
+			raw_input("press ENTER to send TIMEOUT signal ")
+			
+			if rospy.is_shutdown(): break
+			
+			c = raw_input("Confirm (y/n) ")
+			
+			if c == 'y':
+				timeout_msgs = Bool(True)
+				timeout_msgs_publisher.publish(timeout_msgs)
+				print "TIMEOUT SENT"
+			else:
+				print "timeout not sent"
+
+if __name__ == '__main__':
+	try:
+		main()
+	except rospy.ROSInterruptException:
+	#	time.sleep(10)
+		pass

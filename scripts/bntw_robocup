@@ -9,7 +9,7 @@ import yaml
 # ROS imports
 import rospy
 import tf
-from std_msgs.msg import Header, String
+from std_msgs.msg import Header, String, Bool
 from geometry_msgs.msg import Pose2D, Pose, PoseArray, PoseStamped
 from nav_msgs.msg import Path
 
@@ -17,6 +17,7 @@ WP_TO_WP_MIN_DISTANCE = 0.100
 WP_TO_STARTPOINT_MIN_DISTANCE = 0.050
 STOP_DISTANCE_THRESHOLD = 0.050
 
+timeout_signal_received = False
 
 def pose2D_to_pose(pose2D):
 	p = Pose()
@@ -42,10 +43,14 @@ def distance_2D(p1, p2):
 	
 	return math.sqrt( (p1.x-p2.x)**2 + (p1.y-p2.y)**2 )
 
+def timeout_signal_callback(data):
+	global timeout_signal_received
+	timeout_signal_received = True
+
 def main():
 	rospy.init_node("benchmark")
 	
-	rospy.loginfo("benchmarking node started")
+	rospy.loginfo("Benchmarking node started")
 	
 	# init tf, publishers and subscribers
 	tf_listener = tf.TransformListener()
@@ -55,6 +60,8 @@ def main():
 	robot_waypoints_msgs_publisher = rospy.Publisher('/bntw_robocup/visualisation/robot_waypoints', PoseArray, queue_size=10)
 	target_waypoints_msgs_publisher = rospy.Publisher('/bntw_robocup/visualisation/target_waypoints', PoseArray, queue_size=10)
 	score_msgs_publisher = rospy.Publisher('/bntw_robocup/visualisation/current_score', String, queue_size=10)
+	
+	timeout_msgs_subscriber = rospy.Subscriber('/bntw_robocup/timeout_signal', Bool, timeout_signal_callback)
 	
 	# Get the parameters of the benchmark (waypoints, etc)
 	waypoints = rospy.get_param('goal/waypoints')
@@ -118,7 +125,7 @@ def main():
 	#	Main loop:
 	#	 acquire the robot's position every so often and check if it has stopped for at least 3 seconds,
 	#	 in such case collect that pose in a list to compare to the waypoints list
-	while benchmark_running and not rospy.is_shutdown() and i < N:
+	while benchmark_running and not timeout_signal_received and not rospy.is_shutdown() and i < N:
 	
 		# Collect the target and robot poses (using tf)
 		robot_pose_acquired = False
@@ -132,7 +139,7 @@ def main():
 				
 				# broadcast the robot frame relative to the marker
 				tf_broadcaster.sendTransform(marker_to_robot_transform[0], marker_to_robot_transform[1], now, "/actual_robot", "/robot_at_work")
-			
+				
 				# receive the robot transform and compute the robot pose
 				tf_listener.waitForTransform("/world", "/actual_robot", now, rospy.Duration(1.0))
 				( (robot_x, robot_y, _), robot_rotation ) = tf_listener.lookupTransform("/world", "/actual_robot", rospy.Time(0))
@@ -182,10 +189,10 @@ def main():
 						
 						rp = robot_pose	# robot position
 						tp = target_pose # target position
-		
+						
 						d_error = math.sqrt( (rp.x-tp.x)**2 + (rp.y-tp.y)**2 )
 						sum_d = sum_d + d_error
-		
+						
 						sin_error = math.sin(math.fabs(rp.theta - tp.theta))
 						sum_sin = sum_sin + sin_error
 						cos_error = math.cos(math.fabs(rp.theta - tp.theta))
@@ -197,9 +204,10 @@ def main():
 						score_msgs.data += "- Waypoint %i\n  Position Accuracy:\t%1.1f cm\n  Orientation Accuracy:\t%1.0f°\n\n\n"%(i+1, waypoint_position_accuracy*100, math.fabs(waypoint_orientation_accuracy)*180/math.pi)
 						score_msgs_publisher.publish(score_msgs)
 						
-						
 						i += 1
 					
+				
+				score_msgs_publisher.publish(score_msgs)
 				
 				print "waypoints:\n", acquired_waypoints
 				
@@ -222,8 +230,10 @@ def main():
 			# end main loop
 			
 	if rospy.is_shutdown():
-		print "TIMEOUT EMULATED"
+		print "ROSPy shutdown"
 	
+	if timeout_signal_received:
+		print "TIMEOUT SIGNAL RECEIVED"
 	
 	# Wait for result from client
 	end_time = time.time()
@@ -244,16 +254,11 @@ def main():
 	score_msgs_publisher.publish(score_msgs)
 	
 	score_yaml = yaml.dump(score)
-#	benchmark.SendScore(score_yaml)
 	
 	print score_yaml
 	
-	raw_input("press enter to close")
+#	raw_input("press enter to close")
 	
-	# Benchmark concluded
-#	benchmark.End()
-	
-	#time.sleep(10)
 	
 if __name__ == '__main__':
 	try:
@@ -262,5 +267,3 @@ if __name__ == '__main__':
 	#	time.sleep(10)
 		pass
 
-#if __name__ == '__main__':
-#	main()
