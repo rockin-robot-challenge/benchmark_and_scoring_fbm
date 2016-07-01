@@ -10,8 +10,9 @@ Update the configuration with the waypoints.
    · Only before the first run
 Run a roscore;
 Open rviz and load the appropriate configuration from rockin_scoring/config/bntw_robocup_rviz.rviz
+
    · Then, before each run
 Execute roslaunch rockin_scoring bntw_robocup.launch team_name:={team_name}
-where team_name is the same name specified durint the robot-markerset transform measurement.
+where team_name is the same name specified during the robot-markerset transform measurement.
 
 
