@@ -67,6 +67,9 @@ def main():
 	waypoints = rospy.get_param('goal/waypoints')
 	reached_waypoint_stop_time = rospy.get_param('goal/reached_waypoint_stop_time')
 	
+#	for w in waypoints:
+#		print "  - [", w[0]*0.8, ", ", w[1]*0.8, "]"
+	
 	marker_to_robot_transform = rospy.get_param('marker_to_robot_transform')
 	rospy.loginfo(  "marker-robot transform acquired: " + str( marker_to_robot_transform ) )
 	rospy.set_param('goal/num_waypoints', len(waypoints))

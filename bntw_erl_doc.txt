@@ -1,0 +1,17 @@
+ ·	Configuration:
+The cnfiguration consists of the jaml file bntw_robocup.yaml in which it's specified the waiting time before the robot's position is considered a reached waypoint and the ordered sequence of waypoints.
+The waypoints squence is a list of values [x, y, theta], equivalent to a Pose2D in ROS.
+
+ ·	Preparetion:
+The robot-markerset trasform must be measured for each robot and the resulting file saved as 'rockin_scoring/transforms/transform-{team_name}.yaml'.
+Update the configuration with the waypoints.
+
+ ·	Running the benchmark:
+   · Only before the first run
+Run a roscore;
+Open rviz and load the appropriate configuration from rockin_scoring/config/bntw_robocup_rviz.rviz
+   · Then, before each run
+Execute roslaunch rockin_scoring bntw_robocup.launch team_name:={team_name}
+where team_name is the same name specified durint the robot-markerset transform measurement.
+
+

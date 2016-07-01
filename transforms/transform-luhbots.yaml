@@ -1,0 +1,12 @@
+marker_to_robot_transform:
+- [-0.030517273430511756, 0.0030904890719951387, -0.022078117660984]
+- [-0.023168024210497074, 0.014241715076914407, 0.004640821101522979, 0.9996193670519562]
+mocap:
+  rigid_bodies:
+    '3': {child_frame_id: robot_markerset, parent_frame_id: world, pose: robot_markerset/pose}
+    '4': {child_frame_id: robot_markerset, parent_frame_id: world, pose: robot_markerset/pose}
+robot_info: luhbots
+robot_to_marker_transform:
+- [0.02984357625246048, -0.004410024266690016, 0.02276424877345562]
+- [0.023168024210497074, -0.014241715076914407, -0.004640821101522979, 0.9996193670519562]
+transform_timestamp: 2016-06-30_07:24:55

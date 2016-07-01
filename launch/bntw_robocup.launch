@@ -38,7 +38,7 @@
 		<node name="map_server"
 			pkg="map_server"
 			type="map_server"
-			args="$(find rockin_mocap)/config/leipzig_robocup_work_testbed_map.yaml"
+			args="$(find rockin_mocap)/config/leipzig_robocup_work_testbed_realmap.yaml"
 		/>
 		
 		<node name="mocap"
@@ -53,7 +53,7 @@
 		<node pkg="rosbag"
 			type="record"
 			name="log_bntw_robocup"
-			args="record -o /home/rockin/logs/log_bntw_robocup
+			args="record -o /home/rockin/logs/log_bntw_robocup_$(arg team_name)
 				--split --duration=1h
 				/bntw_robocup/info
 				/bntw_robocup/map

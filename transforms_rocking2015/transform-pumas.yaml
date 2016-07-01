@@ -1,0 +1,13 @@
+marker_to_robot_transform:
+- [0.2886302054147096, 0.1253108846471419, -1.648142813935874]
+- [0.025618691986969352, -0.05334437084204354, -0.0077398458652106605, 0.9982174890805741]
+marker_to_robot_transform_2D: [-0.21281283174771612, -0.001930002066433452, 0.0040282268645722525]
+mocap:
+  rigid_bodies:
+    '3': {child_frame_id: robot_markerset, parent_frame_id: world, pose: robot_markerset/pose}
+    '4': {child_frame_id: robot_markerset, parent_frame_id: world, pose: robot_markerset/pose}
+robot_info: pumas
+robot_pose: {theta: 0.0, x: 0.0, y: 0.0}
+robot_to_marker_transform:
+- [-0.10980289429426193, -0.043145474046468735, 1.6737582683563232]
+- [-0.025618691986969352, 0.05334437084204354, 0.0077398458652106605, 0.9982174890805741]
