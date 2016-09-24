@@ -1,0 +1,96 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import math
+import time
+import yaml
+#import random
+
+# ROS imports
+import rospy
+import tf
+from std_msgs.msg import Header, String
+from geometry_msgs.msg import Pose2D, Pose, PoseArray, PoseStamped
+
+N = 25
+queue = []
+n = 0
+
+
+def mocap_callback(poseStamped):
+	global queue, n, N, tf_broadcaster
+	
+	q = poseStamped.pose.orientation
+	(roll, pitch, yaw) = tf.transformations.euler_from_quaternion((q.x, q.y, q.z, q.w))
+	pitch = 0.0 # pitch is te worst error
+	tn = (poseStamped.pose.position.x, poseStamped.pose.position.y, poseStamped.pose.position.z, roll, pitch, yaw)
+	
+	
+	if n < N:
+		queue.append(tn)
+	else:
+		queue[n%N] = tn
+	
+		# compute the average of the transforms
+		x_sum = 0
+		y_sum = 0
+		z_sum = 0
+		
+		roll_sin_sum = 0
+		roll_cos_sum = 0
+		
+		pitch_sin_sum = 0
+		pitch_cos_sum = 0
+	
+		yaw_sin_sum = 0
+		yaw_cos_sum = 0
+		
+		for (x, y, z, roll, pitch, yaw) in queue:
+			roll_sin_sum += math.sin(roll)
+			roll_cos_sum += math.cos(roll)
+			
+			pitch_sin_sum += math.sin(pitch)
+			pitch_cos_sum += math.cos(pitch)
+			
+			yaw_sin_sum += math.sin(yaw)
+			yaw_cos_sum += math.cos(yaw)
+			
+			x_sum += x
+			y_sum += y
+			z_sum += z
+	
+		average_t = ( x_sum/N, y_sum/N, z_sum/N, math.atan2(roll_sin_sum, roll_cos_sum), math.atan2(pitch_sin_sum, pitch_cos_sum), math.atan2(yaw_sin_sum, yaw_cos_sum) )
+		
+		print "x: %3.3f\ty: %3.3f\tz: %3.3f\tr: %3.3f\tp: %3.3f\ty: %3.3f"%average_t
+		
+		# publish the average transform
+		tf_broadcaster.sendTransform(average_t[0:3], tf.transformations.quaternion_from_euler(*average_t[3:6]), rospy.Time.now(), "filtered_robot", "world")
+#		robot_pose_msgs_publisher.publish(robot_pose_msg)
+	
+	n += 1
+	
+
+def main():
+	global queue, n, N, tf_broadcaster
+	
+	rospy.init_node("fbm2h_filtered_pose_node")
+	rospy.loginfo("fbm2h_filtered_pose_node started")
+	
+	# init tf, publishers and subscribers
+	tf_listener = tf.TransformListener()
+	tf_broadcaster = tf.TransformBroadcaster()
+	robot_pose_msgs_publisher = rospy.Publisher('/fbm2h/visualisation/robot_pose', PoseStamped, queue_size=10)
+	mocap_subscriber = rospy.Subscriber("/fbm2h/robot_at_home/pose", PoseStamped, mocap_callback)
+	rospy.loginfo('Subscribed to "/fbm2h/robot_at_home/pose"')
+	
+	rospy.spin()
+	
+	
+if __name__ == '__main__':
+	try:
+		main()
+	except rospy.ROSInterruptException:
+		pass
+
+#if __name__ == '__main__':
+#	main()

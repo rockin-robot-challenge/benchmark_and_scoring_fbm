@@ -1,0 +1,72 @@
+#!/usr/bin/env python
+import math
+import random
+import time
+import yaml
+from datetime import datetime
+
+# ROS imports
+import rospy
+import tf
+from std_msgs.msg import Header, String
+from geometry_msgs.msg import Pose2D, Pose, PoseArray, PoseStamped
+from rockin_scoring.BmBox import BmBox
+
+
+def pose2D_to_pose(pose2D):
+	p = Pose()
+	p.position.x = pose2D.x
+	p.position.y = pose2D.y
+	
+	quaternion = tf.transformations.quaternion_from_euler(0.0, 0.0, pose2D.theta)
+	p.orientation.x = quaternion[0]
+	p.orientation.y = quaternion[1]
+	p.orientation.z = quaternion[2]
+	p.orientation.w = quaternion[3]
+	
+	return p
+
+def pose2D_to_pose_stamped(pose2D):
+	ps = PoseStamped()
+	ps.pose = pose2D_to_pose(pose2D)
+	return ps
+
+
+def main():
+	
+	rospy.init_node("fbm2h_vis")
+	
+	rospy.loginfo("FBM2H waypoints visualisation node started")
+	
+	# init tf and subscribers
+	tf_listener = tf.TransformListener()
+	tf_broadcaster = tf.TransformBroadcaster()
+	target_waypoints_msgs_publisher = rospy.Publisher('/fbm2h/visualisation/target_waypoints', PoseArray, queue_size=10)
+	
+	
+	# acquire marker-robot transform from config
+#	marker_to_robot_transform = rospy.get_param('marker_to_robot_transform')
+#	print  "marker-robot transform acquired: ", marker_to_robot_transform
+	
+	target_waypoints_msgs = PoseArray()
+	target_waypoints_msgs.header.frame_id = 'world'
+	target_waypoints_msgs.poses = []
+	
+	waypoints = rospy.get_param('waypoints')
+
+	for wp in waypoints: target_waypoints_msgs.poses.append(pose2D_to_pose(Pose2D(*wp)))
+#	print target_waypoints_msgs
+	
+	rate = rospy.Rate(1) # 10hz
+	while not rospy.is_shutdown():
+		target_waypoints_msgs_publisher.publish(target_waypoints_msgs)
+		rate.sleep()
+	
+					
+if __name__ == '__main__':
+	try:
+		main()
+	except rospy.ROSInterruptException:
+	#	time.sleep(10)
+		pass
+
