@@ -13,9 +13,11 @@ from std_msgs.msg import Header, String, Bool
 from geometry_msgs.msg import Pose2D, Pose, PoseArray, PoseStamped
 from nav_msgs.msg import Path
 
+WP_TO_TARGET_WP_MAX_DISTANCE = 0.500
 WP_TO_WP_MIN_DISTANCE = 0.100
 WP_TO_STARTPOINT_MIN_DISTANCE = 0.050
 STOP_DISTANCE_THRESHOLD = 0.050
+STOP_ANGULAR_DIFFERENCE_THRESHOLD = 0.1
 
 timeout_signal_received = False
 
@@ -42,6 +44,15 @@ def distance_2D(p1, p2):
 		return None
 	
 	return math.sqrt( (p1.x-p2.x)**2 + (p1.y-p2.y)**2 )
+
+def angular_difference(p1, p2):
+	if not p1 or not p2:
+		return None
+	
+	sin_error = math.sin(math.fabs(p1.theta - p2.theta))
+	cos_error = math.cos(math.fabs(p1.theta - p2.theta))
+	
+	return math.atan2(sin_error, cos_error)
 
 def timeout_signal_callback(data):
 	global timeout_signal_received
@@ -106,7 +117,7 @@ def main():
 	target_waypoints_msgs.poses = []
 	
 	score_msgs = String()
-	score_msgs.data = "\n\n\n\n\nPartial Score:\n\n"
+	score_msgs.data = "\n\n\n\n\nPartial Score:\n"
 	
 	for wp in waypoints: target_waypoints_msgs.poses.append(pose2D_to_pose(Pose2D(*wp)))
 	
@@ -169,7 +180,7 @@ def main():
 				target_waypoints_msgs_publisher.publish(target_waypoints_msgs)
 				
 				# if the robot is moving update the last_stop_time to now
-				if distance_2D(robot_pose, last_stopped_robot_pose) > STOP_DISTANCE_THRESHOLD:
+				if distance_2D(robot_pose, target_pose) > WP_TO_TARGET_WP_MAX_DISTANCE or distance_2D(robot_pose, last_stopped_robot_pose) > STOP_DISTANCE_THRESHOLD or angular_difference(robot_pose, last_stopped_robot_pose) > STOP_ANGULAR_DIFFERENCE_THRESHOLD:
 					last_stop_time = time.time()
 					last_stopped_robot_pose = robot_pose
 					robot_is_stopped = False
@@ -203,8 +214,9 @@ def main():
 						
 						waypoint_position_accuracy = d_error
 						waypoint_orientation_accuracy = math.atan2(sin_error, cos_error)
+						waypoint_time = time.time() - start_time
 						
-						score_msgs.data += "- Waypoint %i\n  Position Accuracy:\t%1.1f cm\n  Orientation Accuracy:\t%1.0f°\n\n\n"%(i+1, waypoint_position_accuracy*100, math.fabs(waypoint_orientation_accuracy)*180/math.pi)
+						score_msgs.data += "- Waypoint %i\n  Position Accuracy:\t%1.1f cm\n  Orientation Accuracy:\t%1.1f°\n  Time:\t%i s\n"%(i+1, waypoint_position_accuracy*100, math.fabs(waypoint_orientation_accuracy)*180/math.pi, waypoint_time)
 						score_msgs_publisher.publish(score_msgs)
 						
 						i += 1
@@ -215,9 +227,11 @@ def main():
 				print "waypoints:\n", acquired_waypoints
 				
 				d = distance_2D(robot_pose, last_stopped_robot_pose)
+				a = angular_difference(robot_pose, last_stopped_robot_pose)
 				
 				print "s: " + str(robot_is_stopped)
-				print "d: %3.3f\t"%d + "-"*int(100*d/STOP_DISTANCE_THRESHOLD)
+				print "d: %3.3f\t"%d + "-"*int(50*d/STOP_DISTANCE_THRESHOLD)
+				print "a: %3.3f\t"%a + "·"*int(50*a/STOP_ANGULAR_DIFFERENCE_THRESHOLD)
 				print "t: %3.1f"%(time.time() - last_stop_time)
 				
 				robot_pose_acquired = True
@@ -253,7 +267,7 @@ def main():
 		'execution_time': execution_time
 	}
 	
-	score_msgs.data += "\n\n\nFinal Score\n\n  Waypoints Reached:\t%i / %i\n\n  Position Accuracy:\t%1.1f cm\n\n  Orientation Accuracy:\t%1.0f°"%(i, N, position_accuracy*100, math.fabs(orientation_accuracy)*180/math.pi)
+	score_msgs.data += "Final Score\n  Waypoints Reached:\t%i / %i\n  Position Accuracy:\t%1.1f cm\n  Orientation Accuracy:\t%1.1f°"%(i, N, position_accuracy*100, math.fabs(orientation_accuracy)*180/math.pi)
 	score_msgs_publisher.publish(score_msgs)
 	
 	score_yaml = yaml.dump(score)

@@ -1,0 +1,45 @@
+<launch>
+
+	<group ns="bntw_robocup">
+		
+		<arg name="team_name" default="" />
+		
+		<rosparam file="$(find rockin_scoring)/config/bntw_robocup.yaml" command="load" />
+		<rosparam file="$(find rockin_scoring)/transforms/transform-$(arg team_name).yaml" command="load" />
+		
+		<!--
+		-->
+		<node name="bmbox"
+			pkg="rockin_scoring"
+			type="bntw_robocup"
+			output="screen"
+		/>
+		
+		<node name="fake_refbox"
+			pkg="rockin_scoring"
+			type="bntw_robocup_fake_refbox"
+			output="screen"
+			launch-prefix="gnome-terminal -e"
+		/>
+		
+		<node name="score_visualiser"
+			pkg="rockin_scoring"
+			type="bntw_robocup_score_visualiser"
+			output="screen"
+			launch-prefix="gnome-terminal -e"
+		/>
+		
+		<node name="world_map"
+			pkg="tf"
+			type="static_transform_publisher"
+			args="0 0 0 0 0 0 world map 100"
+		/>
+		
+		<node name="map_server"
+			pkg="map_server"
+			type="map_server"
+			args="$(find rockin_mocap)/config/leipzig_robocup_work_testbed_realmap.yaml"
+		/>
+		
+	</group>    
+</launch>
