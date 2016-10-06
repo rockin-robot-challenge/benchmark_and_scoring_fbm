@@ -257,7 +257,7 @@ def main():
 	execution_time = end_time - start_time
 	
 	# Evaluate final score
-	position_accuracy = sum_d / N
+	position_accuracy = sum_d / N #TODO WRONG! should be sum_d / len(acquired_waypoints): to be tested
 	orientation_accuracy = math.atan2(sum_sin, sum_cos)
 	
 	score = {
