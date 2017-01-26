@@ -77,7 +77,19 @@ def main():
 				rospy.loginfo("Reference board not visible")
 				time.sleep(1)
 				ref_board_visible = False
-				
+		
+		#Added by Meysam to support removal of the positioner
+		now = rospy.Time.now()
+		br.sendTransform(item['trans'], item['rot'], now, "item", "ref_board")
+		time.sleep(0.5)
+		
+		listener.waitForTransform("/origin", "/item", now, rospy.Duration(2.0))
+		
+		(trans, rot) = listener.lookupTransform("/origin", "/item", rospy.Time(0))		
+		euler = tf.transformations.euler_from_quaternion(rot)
+		temptemp= raw_input("REMOVE POSITIONER and press enter")
+		#End 				
+
 		# Send goal
 		benchmark.SendGoal()
 		start_time = time.time()
@@ -114,16 +126,16 @@ def main():
 			print ("instance_positives = %d" % instance_positives)
 
 		# Evaluate position error
-		now = rospy.Time.now()
-		br.sendTransform(item['trans'], item['rot'], now, "item", "ref_board")
-		time.sleep(0.5)
+		#now = rospy.Time.now()
+		#br.sendTransform(item['trans'], item['rot'], now, "item", "ref_board")
+		#time.sleep(0.5)
 		br.sendTransform(result_trans, result_rot, now, "result_%d" % runs, "origin")
 		time.sleep(0.5)
 		
-		listener.waitForTransform("/origin", "/item", now, rospy.Duration(2.0))
+		#listener.waitForTransform("/origin", "/item", now, rospy.Duration(2.0))
 		
-		(trans, rot) = listener.lookupTransform("/origin", "/item", rospy.Time(0))		
-		euler = tf.transformations.euler_from_quaternion(rot)
+		#(trans, rot) = listener.lookupTransform("/origin", "/item", rospy.Time(0))		
+		#euler = tf.transformations.euler_from_quaternion(rot)
 		
 		x_err = result['x'] - trans[0]
 		y_err = result['y'] - trans[1]
@@ -161,20 +173,21 @@ def main():
 
 	# Evaluate final score
 	score = {
-		'class_accuracy': class_positives / runs,
-		'instance_accuracy': instance_positives / runs,
+		'class_accuracy': class_positives / BENCHMARK_RUNS,
+		'instance_accuracy': instance_positives / BENCHMARK_RUNS,
 		'pose_score': pose_score_sum / runs,
 		'execution_time': execution_time
 
 	}
-	
+
+	print score
 	score_yaml = yaml.dump(score)
 	benchmark.SendScore(score_yaml)
 	
 	# Benchmark concluded
 	benchmark.End()
 
-	print score
+#	print score
 #	time.sleep(10)
 	raw_input("press ENTER to close")
 				
