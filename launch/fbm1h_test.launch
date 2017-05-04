@@ -32,6 +32,13 @@
 			launch-prefix="gnome-terminal -e"
 		/>
 	
+		<node name="score_visualiser"
+			pkg="rockin_scoring"
+			type="score_visualiser"
+			output="screen"
+			launch-prefix="gnome-terminal -e"
+		/>
+
 		<node name="refbox"
 			pkg="rockin_scoring"
 			type="fbm1h_refbox_test"
