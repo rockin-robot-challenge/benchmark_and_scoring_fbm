@@ -29,6 +29,13 @@
 			pkg="rockin_scoring"
 			type="fbm1h"
 			output="screen"
+
+		/>
+
+		<node name="benchmark_score_visualiser"
+			pkg="rockin_scoring"
+			type="score_visualiser"
+			output="screen"
 			launch-prefix="gnome-terminal -e"
 
 		/>

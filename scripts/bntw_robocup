@@ -225,11 +225,12 @@ def main():
 				score_msgs_publisher.publish(score_msgs)
 				
 				print "waypoints:\n", acquired_waypoints
-				
+				td = distance_2D(robot_pose, target_pose)
 				d = distance_2D(robot_pose, last_stopped_robot_pose)
 				a = angular_difference(robot_pose, last_stopped_robot_pose)
 				
 				print "s: " + str(robot_is_stopped)
+				print "td: %3.3f\t"%td + "-"*int(50*td)
 				print "d: %3.3f\t"%d + "-"*int(50*d/STOP_DISTANCE_THRESHOLD)
 				print "a: %3.3f\t"%a + "·"*int(50*a/STOP_ANGULAR_DIFFERENCE_THRESHOLD)
 				print "t: %3.1f"%(time.time() - last_stop_time)
@@ -257,7 +258,7 @@ def main():
 	execution_time = end_time - start_time
 	
 	# Evaluate final score
-	position_accuracy = sum_d / N #TODO WRONG! should be sum_d / len(acquired_waypoints): to be tested
+	position_accuracy = sum_d / len(acquired_waypoints) #TODO to be tested
 	orientation_accuracy = math.atan2(sum_sin, sum_cos)
 	
 	score = {
