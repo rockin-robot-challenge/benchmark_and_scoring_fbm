@@ -1,6 +1,0 @@
-marker_to_robot_transform:
-  - [0.0, 0.0, 0.0]
-  - [0.0, 0.0, 0.0, 1.0]
-robot_info:
-  identity
-

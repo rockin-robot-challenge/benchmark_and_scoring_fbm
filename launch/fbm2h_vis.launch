@@ -4,7 +4,7 @@
 		
 		<arg name="team_name" default="" />
 		
-		<rosparam file="$(find rockin_scoring)/config/fbm2h_vis_goal.yaml" command="load" />
+		<rosparam file="$(find rockin_scoring)/config/fbm2h.yaml" command="load" />
 		
 		<node name="fbm2h_waypoint_vis_node"
 			pkg="rockin_scoring"
@@ -12,11 +12,12 @@
 			output="screen"
 		/>
 		
+<!--
 		<node name="fbm2h_filtered_pose_node"
 			pkg="rockin_scoring"
 			type="fbm2h_filtered_pose"
 			output="screen"
 		/>
-		
+	-->	
 	</group>    
 </launch>

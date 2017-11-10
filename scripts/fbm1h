@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import math
 import random
 import time
@@ -8,6 +9,7 @@ import yaml
 import rospy
 import tf
 from rockin_scoring.BmBox import BmBox
+from std_msgs.msg import Header, String, Bool
 
 # Benchmark runs
 BENCHMARK_RUNS = 10
@@ -29,6 +31,7 @@ def main():
 	# init tf
 	listener = tf.TransformListener()
 	br = tf.TransformBroadcaster()
+	score_msgs_publisher = rospy.Publisher('/visualisation/current_score', String, queue_size=10)
 
 	# Get items
 	items = rospy.get_param('items')
@@ -42,6 +45,9 @@ def main():
 	
 	# Maximum pose error
 	max_pose_error = math.sqrt(math.pow(SIZE_X, 2) + math.pow(SIZE_Y, 2))
+
+	score_msgs = String()
+	score_msgs.data = "\n\n\n\n\nPartial Score:\n"
 
 	# Wait for client
 	benchmark.WaitClient()
@@ -151,25 +157,54 @@ def main():
 		rospy.loginfo("Error measured - X: %2.5f\tY: %2.5f\tW: %3.2f"
 			% (x_err, y_err, w_err))
 	
+
+		score_msgs.data += "\nRUN %i\n\n" % runs
+
+		score_msgs.data += "Actual Item\t\tClass: %s\tInstance: %s\n" % ((item['class'], item['instance']))
+		score_msgs.data += "Received Item\t\tClass: %s\tInstance: %s\n" % (result['item_class'], result['item_instance'])
+		
+		score_msgs.data += "\n"
+
+		score_msgs.data += "Actual Item pose\tx: %2.5f\ty: %2.5f\tw: %3.2f\n" % (trans[0], trans[1], euler[2] * 180 / math.pi)
+		score_msgs.data += "Received Item pose\tx: %2.5f\ty: %2.5f\tw: %3.2f\n" % (result_trans[0], result_trans[1], result['theta'])
+
+		score_msgs.data += "\n"
+		score_msgs.data += "Error Measured\t\tx: %2.5f\ty: %2.5f\tw: %3.2f\n" % (x_err, y_err, w_err)
+	
+		score_msgs.data += "\n"
+
+
+		score_msgs.data += "class_accuracy:\t%i / %i\t  instance_accuracy:\t%i / %i\n"%(class_positives, runs, instance_positives, runs)
+
+		score_msgs.data += "\n"
 		if abs(x_err) < TRANS_ACCURACY : x_err = 0
 		if abs(y_err) < TRANS_ACCURACY : y_err = 0
 		if abs(w_err) < ROT_ACCURACY : w_err = 0
 
 		pose_err_trans = math.sqrt(math.pow(x_err, 2) + math.pow(y_err, 2))
-		if pose_err_trans > max_pose_error : pose_err_trans = 1
+		if pose_err_trans > 1.0 : pose_err_trans = 1.0
+#		if pose_err_trans > max_pose_error : pose_err_trans = 1
 
 		pose_err_rot = abs(w_err) / 180
-		if pose_err_rot > 1 : pose_err_rot = 1
+		if pose_err_rot > 1 : pose_err_rot = 1.0
 		
 		pose_score = 1 - (pose_err_trans / 2) - (pose_err_rot / 2)
 		pose_score_sum = pose_score_sum + pose_score
 
-		rospy.loginfo("Position score - %f (%f | %f)" % (pose_score, 1 - pose_err_trans, 1 - pose_err_rot))
-		
+		rospy.loginfo("Position score - %f (translation: %f \t rotation: %f)\n" % (pose_score, 1 - pose_err_trans, 1 - pose_err_rot))
+		score_msgs.data += "Position score\t\t%f\ttranslation: %f \t rotation: %f\n" % (pose_score, 1 - pose_err_trans, 1 - pose_err_rot)
+
 		# Evaluate execution time
 		execution_time = execution_time + (end_time - start_time)
 
 		rospy.loginfo("Execution time - %f" % execution_time)
+		score_msgs.data += "Execution time\t\t%f\n" % execution_time
+
+		#score_msgs.data += "- Waypoint %i\n  Position Accuracy:\t%1.1f cm\n  Orientation Accuracy:\t%1.1f°\n  Time:\t%i s\n"%(i+1, waypoint_position_accuracy*100, math.fabs(waypoint_orientation_accuracy)*180/math.pi, waypoint_time)
+		score_msgs.data += "\n\n\n"
+		
+		score_msgs_publisher.publish(score_msgs)
+		
 
 	# Evaluate final score
 	score = {
@@ -180,6 +215,9 @@ def main():
 
 	}
 
+	score_msgs.data += "Final Score\n  class_accuracy:\t%1.1f\n  instance_accuracy:\t%1.1f\n  pose_score:\t\t%1.3f"%(class_positives / BENCHMARK_RUNS, instance_positives / BENCHMARK_RUNS, pose_score_sum / runs)
+	score_msgs_publisher.publish(score_msgs)
+	
 	print score
 	score_yaml = yaml.dump(score)
 	benchmark.SendScore(score_yaml)

@@ -30,6 +30,7 @@
 			type="fbm1h"
 			output="screen"
 			launch-prefix="gnome-terminal -e"
+
 		/>
 
 		<node name="record"
